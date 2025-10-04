@@ -9,9 +9,10 @@ import SwiftUI
 
 struct TabBarView: View {
     
-    @State private var selectedTab: Int = 1
+    @State private var selectedTab: Int = 2
     @State private var showCamera: Bool = false
     @State private var image: UIImage?
+    @State private var showBottomSheet: Bool = false
     
     var body: some View {
         
@@ -34,7 +35,7 @@ struct TabBarView: View {
             .tabItem {
                 Label("Camera", systemImage: "camera.fill")
             }
-            .tag(0)
+            .tag(1)
             
             Spacer()
             
@@ -47,7 +48,7 @@ struct TabBarView: View {
             .tabItem {
                 Label("Add", systemImage: "plus.circle.fill")
             }
-            .tag(1)
+            .tag(2)
             
             Spacer()
             
@@ -60,19 +61,27 @@ struct TabBarView: View {
             .tabItem {
                 Label("Account", systemImage: "person.circle.fill")
             }
-            .tag(2)
+            .tag(3)
             
         }
         .padding([.leading, .trailing], 20)
         .onChange(of: selectedTab) { oldValue, newValue in
-            if newValue == 0 {
+            if newValue == 1 {
                 showCamera = true
+            } else if newValue == 2 {
+                showBottomSheet = true
             }
+            selectedTab = newValue
         }
         .sheet(isPresented: $showCamera) {
             ImagePicker(sourceType: .camera) { img in
                 self.image = img
             }
+        }
+        .sheet(isPresented: $showBottomSheet) {
+            BottomSheet(showBottomSheet: $showBottomSheet)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
         }
         
     }
