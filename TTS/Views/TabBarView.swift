@@ -13,6 +13,10 @@ struct TabBarView: View {
     @State private var showCamera: Bool = false
     @State private var image: UIImage?
     @State private var showBottomSheet: Bool = false
+    @State private var showDocumentPicker: Bool = false
+    @State private var selectedDocumentURL: URL?
+    @State private var showFileViewer: Bool = false
+
     
     var body: some View {
         
@@ -79,11 +83,48 @@ struct TabBarView: View {
             }
         }
         .sheet(isPresented: $showBottomSheet) {
-            BottomSheet(showBottomSheet: $showBottomSheet)
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
+            BottomSheet(showBottomSheet: $showBottomSheet) {
+                showDocumentPicker = true
+            }
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
         }
-        
+        .sheet(isPresented: $showDocumentPicker) {
+            DocumentPicker { url in
+                if let localURL = copyToLocal(url: url) {
+                    selectedDocumentURL = localURL
+                    showFileViewer = true
+                } else {
+                    print("Failed to load document")
+                }
+            }
+        }
+        .sheet(isPresented: $showFileViewer) {
+            if let url = selectedDocumentURL {
+                FileViewer(fileURL: url)
+            }
+        }
+    }
+    func copyToLocal(url: URL) -> URL? {
+        var localURL: URL? = nil
+        if url.startAccessingSecurityScopedResource() {
+            defer { url.stopAccessingSecurityScopedResource() }
+            let fileName = url.lastPathComponent
+            let tempDir = FileManager.default.temporaryDirectory
+            let destinationURL = tempDir.appendingPathComponent(fileName)
+            do {
+                if FileManager.default.fileExists(atPath: destinationURL.path) {
+                    try FileManager.default.removeItem(at: destinationURL)
+                }
+                try FileManager.default.copyItem(at: url, to: destinationURL)
+                localURL = destinationURL
+            } catch {
+                print("Error copying file locally: \(error)")
+            }
+        } else {
+            print("Cannot access security-scoped resource")
+        }
+        return localURL
     }
 }
 

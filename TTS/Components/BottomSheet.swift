@@ -10,6 +10,8 @@ import SwiftUI
 struct BottomSheet: View {
     @Binding var showBottomSheet: Bool
     
+    var onDocumentTap: (() -> Void)? = nil
+    
     var body: some View {
         VStack(spacing: 20) {
             // Header
@@ -37,6 +39,10 @@ struct BottomSheet: View {
                     title: "Document",
                     description: "Upload or create a document"
                 )
+                .onTapGesture {
+                    showBottomSheet = false
+                    onDocumentTap?()
+                }
                 BottomSheetOptionRow(
                     icon: "textformat",
                     title: "Text",
