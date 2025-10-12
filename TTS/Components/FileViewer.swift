@@ -7,51 +7,68 @@
 
 import SwiftUI
 import PDFKit
-import UniformTypeIdentifiers
 
 struct FileViewer: View {
+    
     let fileURL: URL
+    @StateObject private var tts = TTSPlayer()
+    @State private var extractedText: String = ""
     
     var body: some View {
         VStack {
             if fileURL.pathExtension.lowercased() == "pdf" {
-                PDFKitView(url: fileURL)
-            } else if ["png", "jpg", "jpeg", "heic", "heif"].contains(fileURL.pathExtension.lowercased()) {
-                if let image = UIImage(contentsOfFile: fileURL.path) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .padding()
-                } else {
-                    Text("Cannot load image")
-                }
-            } else if fileURL.pathExtension.lowercased() == "txt" {
+                PDFKitView(url: fileURL, tts: tts)
+            } else if ["txt"].contains(fileURL.pathExtension.lowercased()) {
                 ScrollView {
                     if let content = try? String(contentsOf: fileURL, encoding: .utf8) {
-                        Text(content)
-                            .padding()
-                    } else {
-                        Text("Cannot read text file")
+                        VStack(alignment: .leading) {
+                            ForEach(tts.sentences.indices, id: \.self) { i in
+                                Text(tts.sentences[i])
+                                    .foregroundColor(tts.currentIndex == i ? .blue : .primary)
+                            }
+                        }
+                        .padding()
+                        .onAppear {
+                            extractedText = content
+                            tts.startReading(content)
+                        }
                     }
                 }
             } else {
                 Text("File type not supported")
-                    .padding()
+            }
+            
+            if !extractedText.isEmpty || fileURL.pathExtension.lowercased() == "pdf" {
+                TTSControlsView(tts: tts, text: extractedText)
             }
         }
+        .onAppear {
+            if fileURL.pathExtension.lowercased() == "pdf" {
+                extractedText = extractText(from: fileURL)
+                tts.startReading(extractedText)
+            }
+        }
+        .onDisappear {
+            tts.stop()
+        }
+        .navigationTitle(fileURL.lastPathComponent)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+    
+    func extractText(from url: URL) -> String {
+        guard let pdf = PDFDocument(url: url) else { return "" }
+        var text = ""
+        for i in 0..<pdf.pageCount {
+            if let page = pdf.page(at: i) {
+                text += page.string ?? ""
+                text += "\n"
+            }
+        }
+        return text
     }
 }
 
-// PDFKit wrapper
-struct PDFKitView: UIViewRepresentable {
-    let url: URL
-    
-    func makeUIView(context: Context) -> PDFView {
-        let pdfView = PDFView()
-        pdfView.autoScales = true
-        pdfView.document = PDFDocument(url: url)
-        return pdfView
-    }
-    
-    func updateUIView(_ uiView: PDFView, context: Context) {}
-}
+
+//#Preview {
+//    FileViewer(fileURL: URL(fileURLWithPath: "/path/to/sample.pdf"), tts: <#TTSPlayer#>)
+//}
