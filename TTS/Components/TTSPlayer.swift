@@ -98,15 +98,50 @@ class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
 
     // MARK: - Private Helpers
 
-    /// Splits text into sentences using punctuation marks.
+    /// Splits text into sentences but also preserves headings (lines without trailing punctuation)
+    private func splitIntoSentencesPreservingHeadings(_ text: String) -> [String] {
+        // 1) Normalize newlines
+        let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
+                             .replacingOccurrences(of: "\r", with: "\n")
+        // 2) Split by lines first so single-line headings are preserved as units
+        let lines = normalized.components(separatedBy: "\n")
+        var results: [String] = []
+
+        let sentenceDelimiters = CharacterSet(charactersIn: ".!?")
+
+        for rawLine in lines {
+            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !line.isEmpty else { continue }
+
+            // If the line already looks like a heading (no terminal punctuation), keep as-is
+            if let last = line.unicodeScalars.last, !sentenceDelimiters.contains(last) {
+                results.append(line)
+                continue
+            }
+
+            // Otherwise, split the line further by sentence punctuation to get multiple sentences
+            var buffer = ""
+            for ch in line {
+                buffer.append(ch)
+                if ".!?".contains(ch) {
+                    let sentence = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !sentence.isEmpty { results.append(sentence) }
+                    buffer.removeAll(keepingCapacity: true)
+                }
+            }
+            // Any trailing content without punctuation becomes a heading-like sentence
+            let tail = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !tail.isEmpty { results.append(tail) }
+        }
+
+        // Collapse multiple spaces and filter empties
+        return results.map { $0.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression) }
+                      .filter { !$0.isEmpty }
+    }
+
+    /// Backwards-compatible name used by the rest of the class
     private func splitIntoSentences(_ text: String) -> [String] {
-        let delimiters = CharacterSet(charactersIn: ".!?")
-        let parts = text
-            .components(separatedBy: delimiters)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        print("📘 Total sentences: \(parts.count)")
-        return parts
+        return splitIntoSentencesPreservingHeadings(text)
     }
 
     /// Speaks the current sentence aloud.

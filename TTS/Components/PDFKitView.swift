@@ -136,9 +136,41 @@ struct PDFKitView: UIViewRepresentable {
 
         // Find the word inside the sentence range, on this page
         guard let sentenceRange = pageText.range(of: sentence) else { return }
-        if let wordRange = pageText.range(of: word,
-                                          options: [.caseInsensitive],
-                                          range: sentenceRange) {
+
+        // Determine which occurrence index of `word` we're speaking within the sentence.
+        // We do this by counting occurrences up to the start of the currentWordRange inside the utterance string.
+        let spokenIndex: Int = {
+            guard let range = tts.currentWordRange else { return 0 }
+            let utter = tts.currentSentenceText
+            let start = utter.startIndex
+            if let startIdx = Range(range, in: utter)?.lowerBound {
+                let prefix = String(utter[start..<startIdx])
+                // Count case-insensitive occurrences of `word` in the prefix
+                var count = 0
+                var searchRange: Range<String.Index>? = prefix.startIndex..<prefix.endIndex
+                while let r = prefix.range(of: word, options: [.caseInsensitive], range: searchRange) {
+                    count += 1
+                    searchRange = r.upperBound..<prefix.endIndex
+                }
+                return count
+            }
+            return 0
+        }()
+
+        // Now find the same occurrence of `word` within the sentence range on the page
+        var foundRange: Range<String.Index>? = nil
+        var occurrence = 0
+        var searchRange: Range<String.Index>? = sentenceRange
+        while let r = pageText.range(of: word, options: [.caseInsensitive], range: searchRange) {
+            if occurrence == spokenIndex {
+                foundRange = r
+                break
+            }
+            occurrence += 1
+            searchRange = r.upperBound..<sentenceRange.upperBound
+        }
+
+        if let wordRange = foundRange {
             let nsWordRange = NSRange(wordRange, in: pageText)
             if let selection = page.selection(for: nsWordRange) {
                 let bounds = selection.bounds(for: page)
@@ -146,7 +178,6 @@ struct PDFKitView: UIViewRepresentable {
                 highlight.color = UIColor.orange.withAlphaComponent(0.45)
                 page.addAnnotation(highlight)
                 coordinator.currentWordHighlight = highlight
-                // We don't force scroll here; sentence highlight already positioned view.
             }
         }
     }
