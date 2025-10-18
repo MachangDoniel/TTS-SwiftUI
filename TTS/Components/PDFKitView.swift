@@ -231,7 +231,7 @@ struct PDFKitView: UIViewRepresentable {
             let lineBounds = lineSel.bounds(for: page)
             guard !lineBounds.isEmpty else { continue }
             let ann = PDFAnnotation(bounds: lineBounds, forType: PDFAnnotationSubtype.highlight, withProperties: nil)
-            ann.color = UIColor.yellow.withAlphaComponent(0.35)
+            ann.color = UIColor.darkGray.withAlphaComponent(0.18)
             ann.userName = "tts_sentence"
             page.addAnnotation(ann)
             created.append(ann)
@@ -387,7 +387,7 @@ struct PDFKitView: UIViewRepresentable {
             guard coordinator.highlightVersion == version else { return }
             let bounds = selection.bounds(for: page)
             let highlight = PDFAnnotation(bounds: bounds, forType: PDFAnnotationSubtype.highlight, withProperties: nil)
-            highlight.color = UIColor.orange.withAlphaComponent(0.45)
+            highlight.color = UIColor.systemBlue.withAlphaComponent(0.30)
             highlight.userName = "tts_word"
             page.addAnnotation(highlight)
             coordinator.currentWordHighlight = highlight
