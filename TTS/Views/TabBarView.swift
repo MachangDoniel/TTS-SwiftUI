@@ -57,10 +57,9 @@ struct TabBarView: View {
                 .tag(3)
             }
             .padding([.leading, .trailing], 20)
-            .onChange(of: selectedTab) { _, newValue in
+            .onChange(of: selectedTab) { newValue in
                 if newValue == 1 { showCamera = true }
                 else if newValue == 2 { showBottomSheet = true }
-                selectedTab = newValue
             }
             // Camera
             .sheet(isPresented: $showCamera) {
