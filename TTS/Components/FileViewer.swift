@@ -7,11 +7,17 @@
 
 import SwiftUI
 import PDFKit
+import AVFAudio
 
 struct FileViewer: View {
-    
     let fileURL: URL
-    @StateObject private var tts = TTSPlayer()
+    @ObservedObject var tts: TTSPlayer
+    
+    init(fileURL: URL, tts: TTSPlayer) {
+        self.fileURL = fileURL
+        self._tts = ObservedObject(initialValue: tts)
+    }
+    
     @State private var extractedText: String = ""
     
     var body: some View {
@@ -30,7 +36,22 @@ struct FileViewer: View {
                         .padding()
                         .onAppear {
                             extractedText = content
-                            tts.startReading(content)
+                            tts.currentTitle = fileURL.lastPathComponent
+                            if tts.currentURL != fileURL {
+                                tts.stop()
+                                tts.currentURL = fileURL
+                                tts.currentIndex = 0
+                                tts.currentWordRange = nil
+                                tts.currentWordInSentence = ""
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                    tts.startReading(content)
+                                }
+                            } else if tts.sentences.isEmpty || tts.currentSentenceText.isEmpty || !tts.isSpeaking {
+                                tts.currentIndex = 0
+                                tts.currentWordRange = nil
+                                tts.currentWordInSentence = ""
+                                tts.startReading(content)
+                            }
                         }
                     }
                 }
@@ -44,12 +65,35 @@ struct FileViewer: View {
         }
         .onAppear {
             if fileURL.pathExtension.lowercased() == "pdf" {
-                extractedText = extractText(from: fileURL)
-                tts.startReading(extractedText)
+                let text = extractText(from: fileURL)
+                extractedText = text
+                tts.currentTitle = fileURL.lastPathComponent
+                // Restart if a new file is selected (different URL)
+                if tts.currentURL != fileURL {
+                    // ✅ Hard reset: replace the AVSpeechSynthesizer to prevent leftover callbacks
+                    tts.stop()
+                    tts.synthesizer.delegate = nil
+                    tts.synthesizer = AVSpeechSynthesizer()
+                    tts.synthesizer.delegate = tts
+
+                    // Reset state before speaking
+                    tts.currentURL = fileURL
+                    tts.currentIndex = 0
+                    tts.currentWordRange = nil
+                    tts.currentWordInSentence = ""
+
+                    // Give a short delay to allow any UI updates before speaking
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        tts.startReading(text)
+                    }
+                } else if tts.sentences.isEmpty || tts.currentSentenceText.isEmpty || !tts.isSpeaking {
+                    // Start if nothing is currently speaking
+                    tts.currentIndex = 0
+                    tts.currentWordRange = nil
+                    tts.currentWordInSentence = ""
+                    tts.startReading(text)
+                }
             }
-        }
-        .onDisappear {
-            tts.stop()
         }
         .navigationTitle(fileURL.lastPathComponent)
         .navigationBarTitleDisplayMode(.inline)
@@ -70,5 +114,6 @@ struct FileViewer: View {
 
 
 //#Preview {
-//    FileViewer(fileURL: URL(fileURLWithPath: "/path/to/sample.pdf"), tts: <#TTSPlayer#>)
+//    FileViewer(fileURL: URL(fileURLWithPath: "/path/to/sample.pdf"), tts: TTSPlayer())
 //}
+

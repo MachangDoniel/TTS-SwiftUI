@@ -36,7 +36,16 @@ struct PDFKitView: UIViewRepresentable {
         let pdfView = PDFView()
         pdfView.autoScales = true
         pdfView.document = PDFDocument(url: url)
-        context.coordinator.stopTTS = { tts.stop() }
+
+        // React to source URL changes → clear caches/highlights and re-highlight current sentence
+        tts.$currentURL
+            .receive(on: DispatchQueue.main)
+            .sink { _ in
+                clearAllHighlights(in: pdfView, coordinator: context.coordinator)
+                // Re-apply sentence highlight for the current index if available
+                highlightSentence(in: pdfView, index: tts.currentIndex, coordinator: context.coordinator)
+            }
+            .store(in: &context.coordinator.cancellables)
 
         // React to sentence changes → highlight sentence (and clear word highlight)
         tts.$currentIndex
@@ -62,16 +71,8 @@ struct PDFKitView: UIViewRepresentable {
             }
             .store(in: &context.coordinator.cancellables)
 
-        // Stop TTS when app resigns active or enters background
-        NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)
-            .receive(on: DispatchQueue.main)
-            .sink { _ in context.coordinator.stopTTS?() }
-            .store(in: &context.coordinator.cancellables)
-
-        NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)
-            .receive(on: DispatchQueue.main)
-            .sink { _ in context.coordinator.stopTTS?() }
-            .store(in: &context.coordinator.cancellables)
+        // Initial highlight when view is created
+        highlightSentence(in: pdfView, index: tts.currentIndex, coordinator: context.coordinator)
 
         return pdfView
     }
@@ -81,8 +82,6 @@ struct PDFKitView: UIViewRepresentable {
     }
 
     static func dismantleUIView(_ uiView: PDFView, coordinator: Coordinator) {
-        // Stop TTS
-        coordinator.stopTTS?()
         // Clear any outstanding annotations
         if let doc = uiView.document {
             for i in 0..<doc.pageCount {
@@ -103,6 +102,18 @@ struct PDFKitView: UIViewRepresentable {
                 page.removeAnnotation(annotation)
             }
         }
+    }
+
+    private func clearAllHighlights(in pdfView: PDFView, coordinator: Coordinator) {
+        if let doc = pdfView.document {
+            clearAnnotations(in: doc, userName: "tts_sentence")
+            clearAnnotations(in: doc, userName: "tts_word")
+        }
+        coordinator.currentSentenceHighlight = nil
+        coordinator.currentWordHighlight = nil
+        coordinator.currentSentenceAnnotations.removeAll()
+        coordinator.sentencePageCache.removeAll()
+        coordinator.highlightVersion &+= 1
     }
 
     // MARK: - Sentence highlight (yellow) with page caching

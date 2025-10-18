@@ -28,6 +28,13 @@ class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     /// Indicates whether speech is currently paused
     @Published var isPaused: Bool = false
 
+    @Published var hasActiveItem: Bool = false
+    @Published var progress: Double = 0.0
+    @Published var currentTitle: String? = nil
+
+    /// The URL of the current source being read (PDF, TXT, etc.)
+    @Published var currentURL: URL? = nil
+
     /// The full sentence currently being read
     @Published var currentSentenceText: String = ""
 
@@ -37,8 +44,8 @@ class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     /// The range of the current word in the current sentence
     @Published var currentWordRange: NSRange? = nil
 
-    // MARK: - Private Properties
-    private var synthesizer = AVSpeechSynthesizer()
+    // MARK: - Properties
+    var synthesizer = AVSpeechSynthesizer()
 
     // MARK: - Init
     override init() {
@@ -51,6 +58,8 @@ class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     /// Starts reading the full text from the beginning.
     func startReading(_ text: String) {
         stop()
+        hasActiveItem = true
+        progress = 0.0
         sentences = splitIntoSentences(text)
         currentIndex = 0
         speakCurrentSentence()
@@ -71,13 +80,28 @@ class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
         }
     }
 
+    func pause() {
+        synthesizer.pauseSpeaking(at: .immediate)
+        isPaused = true
+    }
+
+    func resume() {
+        synthesizer.continueSpeaking()
+        isPaused = false
+    }
+
     /// Stops all speech immediately.
     func stop() {
         synthesizer.stopSpeaking(at: .immediate)
+        hasActiveItem = false
+        progress = 0.0
         isSpeaking = false
         isPaused = false
         currentWordInSentence = ""
         currentSentenceText = ""
+        currentURL = nil
+        sentences = []
+        currentIndex = 0
     }
 
     /// Moves to the next sentence (if available).
@@ -236,6 +260,7 @@ class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
 
         isSpeaking = true
         isPaused = false
+        progress = sentences.isEmpty ? 0.0 : Double(currentIndex) / Double(max(1, sentences.count))
 
         print("🔊 Reading sentence \(currentIndex + 1)/\(sentences.count): \(sentence)")
     }
@@ -260,11 +285,16 @@ class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
             self.isSpeaking = false
             self.isPaused = false
             self.currentWordInSentence = ""
+            self.progress = self.sentences.isEmpty ? 1.0 : Double(self.currentIndex + 1) / Double(max(1, self.sentences.count))
 
             // Move to next sentence automatically
             if self.currentIndex < self.sentences.count - 1 {
                 self.currentIndex += 1
                 self.speakCurrentSentence()
+            } else {
+                self.isSpeaking = false
+                self.isPaused = false
+                self.hasActiveItem = false
             }
         }
     }
