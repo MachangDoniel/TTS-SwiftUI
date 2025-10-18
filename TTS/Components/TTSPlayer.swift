@@ -103,40 +103,118 @@ class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
         // 1) Normalize newlines
         let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
                              .replacingOccurrences(of: "\r", with: "\n")
-        // 2) Split by lines first so single-line headings are preserved as units
-        let lines = normalized.components(separatedBy: "\n")
+        // 2) Break into raw lines
+        let rawLines = normalized.components(separatedBy: "\n")
+
+        // Heuristics
+        let bulletPrefixes = ["- ", "• ", "* ", "– ", "— "]
+        let numberedRegex = try? NSRegularExpression(pattern: "^\n?\\s*\\d+[\\.)]\\s+", options: [])
+        let headingColonSuffix: Character = ":"
+        let sentencePattern = "(?<!\\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|vs|No|Fig|e|i)\\.)(?<=[.!?])\\s+"
+        let sentenceRegex = try? NSRegularExpression(pattern: sentencePattern, options: [.caseInsensitive])
+
+        func isBulletOrNumbered(_ s: String) -> Bool {
+            if bulletPrefixes.first(where: { s.hasPrefix($0) }) != nil { return true }
+            if let re = numberedRegex, re.firstMatch(in: s, options: [], range: NSRange(location: 0, length: (s as NSString).length)) != nil {
+                return true
+            }
+            return false
+        }
+
+        func isLikelyHeading(_ s: String) -> Bool {
+            let trimmed = s.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else { return false }
+            if trimmed.last == headingColonSuffix { return true }
+            let punctSet = CharacterSet(charactersIn: ".!?")
+            if let last = trimmed.unicodeScalars.last, punctSet.contains(last) == false {
+                let isShort = trimmed.count <= 80
+                let words = trimmed.split(separator: " ")
+                let titleCasedTokens = words.filter { token in
+                    guard let first = token.first else { return false }
+                    return String(first).uppercased() == String(first) && token.dropFirst().allSatisfy { $0.isLowercase || !$0.isLetter }
+                }
+                if isShort && titleCasedTokens.count >= max(1, words.count / 2) {
+                    return true
+                }
+            }
+            return false
+        }
+
+        // 3) Group consecutive non-heading, non-bullet lines into paragraphs (join with spaces)
+        var paragraphs: [String] = []
+        var currentPara: [String] = []
+
+        func flushPara() {
+            if !currentPara.isEmpty {
+                let joined = currentPara.joined(separator: " ")
+                paragraphs.append(joined)
+                currentPara.removeAll()
+            }
+        }
+
+        for raw in rawLines {
+            let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if line.isEmpty {
+                // Paragraph break
+                flushPara()
+                continue
+            }
+            if isBulletOrNumbered(line) || isLikelyHeading(line) {
+                // Finish any running paragraph, then add this as standalone
+                flushPara()
+                paragraphs.append(line)
+                continue
+            }
+            // Otherwise, part of the current paragraph (do not treat newline as sentence boundary)
+            currentPara.append(line)
+        }
+        // Flush tail
+        flushPara()
+
+        // 4) Split paragraphs into sentences (headings/bullets will be single-item paragraphs)
         var results: [String] = []
-
-        let sentenceDelimiters = CharacterSet(charactersIn: ".!?")
-
-        for rawLine in lines {
-            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !line.isEmpty else { continue }
-
-            // If the line already looks like a heading (no terminal punctuation), keep as-is
-            if let last = line.unicodeScalars.last, !sentenceDelimiters.contains(last) {
-                results.append(line)
+        for para in paragraphs {
+            // If paragraph looks like a heading/bullet, keep as-is
+            if isBulletOrNumbered(para) || isLikelyHeading(para) {
+                results.append(para)
                 continue
             }
 
-            // Otherwise, split the line further by sentence punctuation to get multiple sentences
-            var buffer = ""
-            for ch in line {
-                buffer.append(ch)
-                if ".!?".contains(ch) {
-                    let sentence = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Use regex to split sentences while keeping punctuation
+            if let re = sentenceRegex {
+                let ns = para as NSString
+                let range = NSRange(location: 0, length: ns.length)
+                var lastIndex = 0
+                re.enumerateMatches(in: para, options: [], range: range) { match, _, _ in
+                    guard let match = match else { return }
+                    let end = match.range.location + match.range.length
+                    let sentence = ns.substring(with: NSRange(location: lastIndex, length: end - lastIndex)).trimmingCharacters(in: .whitespaces)
                     if !sentence.isEmpty { results.append(sentence) }
-                    buffer.removeAll(keepingCapacity: true)
+                    lastIndex = end
                 }
+                if lastIndex < ns.length {
+                    let tail = ns.substring(from: lastIndex).trimmingCharacters(in: .whitespaces)
+                    if !tail.isEmpty { results.append(tail) }
+                }
+            } else {
+                // Fallback character-walk
+                var buffer = ""
+                for ch in para {
+                    buffer.append(ch)
+                    if ".!?".contains(ch) {
+                        let sentence = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !sentence.isEmpty { results.append(sentence) }
+                        buffer.removeAll(keepingCapacity: true)
+                    }
+                }
+                let tail = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !tail.isEmpty { results.append(tail) }
             }
-            // Any trailing content without punctuation becomes a heading-like sentence
-            let tail = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !tail.isEmpty { results.append(tail) }
         }
 
-        // Collapse multiple spaces and filter empties
-        return results.map { $0.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression) }
-                      .filter { !$0.isEmpty }
+        // 5) Normalize whitespaces
+        let collapsed = results.map { $0.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression) }
+        return collapsed.filter { !$0.isEmpty }
     }
 
     /// Backwards-compatible name used by the rest of the class
@@ -201,3 +279,4 @@ class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
         }
     }
 }
+
