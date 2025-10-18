@@ -84,13 +84,10 @@ struct TabBarView: View {
                 Spacer()
 
                 // Profile Tab (placeholder)
-                VStack {
-                    Text("Profile")
-                        .font(.largeTitle)
-                        .padding()
-                }
-                .tabItem { Label("Profile", systemImage: "person.crop.circle") }
-                .tag(2)
+                ProfileView()
+                    .preferredColorScheme(.dark)
+                    .tabItem { Label("Profile", systemImage: "person.crop.circle") }
+                    .tag(2)
             }
             .sheet(isPresented: $showDocumentPicker) {
                 DocumentPicker { url in

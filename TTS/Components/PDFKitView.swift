@@ -225,7 +225,7 @@ struct PDFKitView: UIViewRepresentable {
         }
 
         // Create per-line highlights for better fidelity on wrapped text
-        let lineSelections = selection.selectionsByLine() ?? [selection]
+        let lineSelections = selection.selectionsByLine()
         var created: [PDFAnnotation] = []
         for lineSel in lineSelections {
             let lineBounds = lineSel.bounds(for: page)
