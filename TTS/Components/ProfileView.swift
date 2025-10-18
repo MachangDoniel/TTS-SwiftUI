@@ -8,6 +8,7 @@ struct ProfileView: View {
     @State private var isShowingShareSheet = false
     @State private var isShowingAlert = false
     @State private var alertMessage = ""
+    @State private var navigateToAbout: Bool = false
     
     var body: some View {
         NavigationStack {
@@ -104,7 +105,13 @@ struct ProfileView: View {
             Divider().background(Color.white.opacity(0.1))
             SettingsRow(title: "Terms of Use", action: { openURL("https://example.com/terms") })
             Divider().background(Color.white.opacity(0.1))
-            SettingsRow(title: "About", action: { alertMessage = "App version 1.0.0"; isShowingAlert = true })
+            SettingsRow(title: "About", action: { navigateToAbout = true })
+                .background(
+                    NavigationLink(destination: AboutView(), isActive: $navigateToAbout) {
+                        EmptyView()
+                    }
+                    .hidden()
+                )
         }
         .background(Color(red: 0.13, green: 0.13, blue: 0.14))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
