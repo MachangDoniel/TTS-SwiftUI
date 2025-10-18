@@ -99,7 +99,6 @@ class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
         isPaused = false
         currentWordInSentence = ""
         currentSentenceText = ""
-        currentURL = nil
         sentences = []
         currentIndex = 0
     }

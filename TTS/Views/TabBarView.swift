@@ -131,9 +131,18 @@ struct TabBarView: View {
             }
             .overlay(alignment: .bottom) {
                 if tts.hasActiveItem {
-                    CompactTTSControlBar(ttsPlayer: tts, title: tts.currentTitle ?? "Now Playing", onTap: {
+                    MiniTTSBar(ttsPlayer: tts, title: tts.currentTitle ?? "Now Playing", onTap: {
                         if let url = tts.currentURL {
+                            selectedTab = 0
                             selectedDocumentURL = url
+                        } else if let url = selectedDocumentURL {
+                            // Fallback: navigate to the last selected document
+                            selectedTab = 0
+                            selectedDocumentURL = url
+                        } else {
+                            debugPrint("Nothing to play or open")
+                            // Optional: show a message to the user
+                            // e.g., present an alert or haptic to indicate there's nothing to open
                         }
                     })
                     .padding(.bottom, 56) // keep above the tab bar (approx 49) + spacing
