@@ -5,12 +5,8 @@ import Foundation
 import SwiftUI
 import Combine
 import CoreData
-#if canImport(PDFKit)
 import PDFKit
-#endif
-#if canImport(UIKit)
 import UIKit
-#endif
 
 // MARK: - Model
 struct RecentActivity: Identifiable, Codable, Equatable {
@@ -39,6 +35,44 @@ struct RecentActivity: Identifiable, Codable, Equatable {
     var thumbnailData: Data? // optional small preview (e.g., PDF first page)
     var bookmarkData: Data? // security-scoped bookmark for external files
 
+    // Derived file extension and category, based on sourcePath or title
+    var fileExtensionLowercased: String? {
+        // Prefer sourcePath if available
+        if let sp = sourcePath, !sp.isEmpty {
+            // Try to parse as URL first
+            if let url = URL(string: sp), url.scheme != nil {
+                let ext = url.pathExtension
+                if !ext.isEmpty { return ext.lowercased() }
+            }
+            // Fall back to path string
+            if let ext = sp.split(separator: ".").last, sp.contains(".") {
+                return String(ext).lowercased()
+            }
+        }
+        // Fallback: try to infer from title if it contains an extension
+        if let ext = title.split(separator: ".").last, title.contains(".") {
+            return String(ext).lowercased()
+        }
+        return nil
+    }
+
+    enum FileCategory {
+        case pdf
+        case text
+        case image
+        case other
+    }
+
+    var fileCategory: FileCategory {
+        if kind == .text { return .text }
+        if kind == .photos { return .image }
+        guard let ext = fileExtensionLowercased else { return .other }
+        if ext == "pdf" { return .pdf }
+        if ext == "txt" { return .text }
+        if ["png", "jpg", "jpeg", "heic"].contains(ext) { return .image }
+        return .other
+    }
+
     init(id: UUID = UUID(), title: String, sourcePath: String? = nil, kind: Kind, createdAt: Date = Date(), thumbnailData: Data? = nil, bookmarkData: Data? = nil) {
         self.id = id
         self.title = title
@@ -47,6 +81,37 @@ struct RecentActivity: Identifiable, Codable, Equatable {
         self.createdAt = createdAt
         self.thumbnailData = thumbnailData
         self.bookmarkData = bookmarkData
+    }
+
+    // Resolve a usable URL for this activity, preferring security-scoped bookmarks
+    var resolvedURL: URL? {
+        // 1) Try bookmark if available (for external files)
+        if let bookmarkData {
+            var isStale = false
+            if let url = try? URL(resolvingBookmarkData: bookmarkData,
+                                  options: [.withoutUI],
+                                  relativeTo: nil,
+                                  bookmarkDataIsStale: &isStale) {
+                return url
+            }
+        }
+
+        // 2) Fall back to sourcePath
+        guard let sp = sourcePath, !sp.isEmpty else { return nil }
+
+        // If it's a proper URL string (has a scheme), use it
+        if let url = URL(string: sp), url.scheme != nil {
+            return url
+        }
+
+        // Otherwise treat it as a local file path
+        return URL(fileURLWithPath: sp)
+    }
+
+    // Convenience for checking disk existence when resolvedURL is file URL
+    var fileExistsOnDisk: Bool {
+        guard let url = resolvedURL, url.isFileURL else { return false }
+        return FileManager.default.fileExists(atPath: url.path)
     }
 }
 
@@ -145,15 +210,11 @@ final class RecentStore: ObservableObject {
         let base = fileURL.deletingPathExtension().lastPathComponent
         let display = sanitizeTitle(base)
         var thumb: Data? = nil
-        #if canImport(PDFKit)
         if fileURL.pathExtension.lowercased() == "pdf", let doc = PDFDocument(url: fileURL), let page = doc.page(at: 0) {
-            #if canImport(UIKit)
             let size = CGSize(width: 64, height: 64)
             let img = page.thumbnail(of: size, for: .cropBox)
             thumb = img.pngData()
-            #endif
         }
-        #endif
         let activity = RecentActivity(title: display,
                                       sourcePath: fileURL.isFileURL ? fileURL.path : fileURL.absoluteString,
                                       kind: kind,
@@ -165,15 +226,11 @@ final class RecentStore: ObservableObject {
         let base = fileURL.deletingPathExtension().lastPathComponent
         let display = sanitizeTitle(base)
         var thumb: Data? = nil
-        #if canImport(PDFKit)
         if fileURL.pathExtension.lowercased() == "pdf", let doc = PDFDocument(url: fileURL), let page = doc.page(at: 0) {
-            #if canImport(UIKit)
             let size = CGSize(width: 64, height: 64)
             let img = page.thumbnail(of: size, for: .cropBox)
             thumb = img.pngData()
-            #endif
         }
-        #endif
         let activity = RecentActivity(title: display,
                                       sourcePath: fileURL.isFileURL ? fileURL.path : fileURL.absoluteString,
                                       kind: kind,

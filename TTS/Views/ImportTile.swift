@@ -25,7 +25,7 @@ struct ImportTile: View {
                             .foregroundColor(tint)
                     }
                     Text(title)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white)
                 }
                 .padding(10)

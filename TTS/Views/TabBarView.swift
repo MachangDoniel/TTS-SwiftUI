@@ -74,14 +74,12 @@ struct TabBarView: View {
                 
                 Spacer()
 
-                // Library Tab (placeholder)
-                VStack {
-                    Text("Library")
-                        .font(.largeTitle)
-                        .padding()
-                }
-                .tabItem { Label("Library", systemImage: "tray.fill") }
-                .tag(1)
+                // Library Tab
+                LibraryView()
+                    .tabItem { Label("Library", systemImage: "tray.fill") }
+                    .tag(1)
+                    .environmentObject(recentStore)
+                    .environmentObject(tts)
                 
                 Spacer()
 

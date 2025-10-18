@@ -5,76 +5,90 @@ struct HeaderSlide: View {
 
     var body: some View {
         ZStack(alignment: .leading) {
-            // Background stack: gradient + glow + sheen
-            ZStack {
-                // 1) Base gradient (multi-stop for smoother blend)
-                LinearGradient(
-                    gradient: Gradient(stops: [
-                        .init(color: Color(red: 0.38, green: 0.32, blue: 0.98), location: 0.0),
-                        .init(color: Color(red: 0.33, green: 0.61, blue: 0.99), location: 1.0)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-
-                // 2) Soft radial glow toward the center-right
-                RadialGradient(
-                    gradient: Gradient(colors: [
-                        Color.white.opacity(0.20),
-                        Color.white.opacity(0.00)
-                    ]),
-                    center: .init(x: 0.75, y: 0.35),
-                    startRadius: 10,
-                    endRadius: 260
-                )
-
-                // 3) Subtle top sheen
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.10),
-                        Color.white.opacity(0.00)
-                    ],
-                    startPoint: .top,
-                    endPoint: .center
-                )
-            }
-            .frame(height: 200)
-            .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+            // Background gradient with correct corner masking
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(red: 0.42, green: 0.36, blue: 0.98),
+                    Color(red: 0.36, green: 0.63, blue: 0.99)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
             .padding(.horizontal, 16)
-            .padding(.top, 0)
-            .ignoresSafeArea(edges: .top)
+            .frame(height: 140)
+            .shadow(color: Color.black.opacity(0.15), radius: 6, x: 0, y: 3)
 
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Listen with the most\nadvanced AI Voices")
-                        .font(.system(size: 20, weight: .semibold))
+            // Overlay content (inside same rounded shape)
+            HStack {
+                // Left side: text + button
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Listen with the most advanced\nAI Voices uh")
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.white)
                         .fixedSize(horizontal: false, vertical: true)
+                        .shadow(color: .black.opacity(0.25), radius: 3, x: 0, y: 2)
 
+                    Spacer()
+                    
                     Button(action: { onTryForFree?() }) {
-                        Text("Try for free")
-                            .font(.system(size: 14, weight: .semibold))
+                        Text("Try now")
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(.black)
-                            .padding(.horizontal, 20)
+                            .padding(.horizontal, 22)
                             .padding(.vertical, 12)
                             .background(Color.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
                 }
+                .padding(.leading, 20)
+                .padding(.vertical, 20)
+
                 Spacer()
-                Image(systemName: "book.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 72, height: 72)
-                    .foregroundColor(Color.white.opacity(0.9))
-                    .padding(.top, 12)
-                    .padding(.trailing, 24)
+
+                // Right side: stacked 3 portraits diagonally
+                ZStack {
+                    // Bottom small portrait
+                    Image("person3")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 26, height: 26)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.white, lineWidth: 0))
+                        .shadow(radius: 3)
+                        .offset(x: 0, y: 48)
+
+                    // Middle portrait
+                    Image("person2")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 38, height: 38)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.white, lineWidth: 0))
+                        .shadow(radius: 3)
+                        .offset(x: -40, y: 30)
+
+                    // Top main portrait
+                    Image("person1")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 74, height: 74)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.white, lineWidth: 0))
+                        .shadow(radius: 4)
+                        .offset(x: 10, y: -10)
+                }
+                .padding(.trailing, 24)
             }
-            .padding(.horizontal, 32)
+            .padding(.horizontal, 16)
         }
+        .frame(height: 140)
     }
 }
 
 #Preview {
-    ZStack { Color.black.ignoresSafeArea(); HeaderSlide(onTryForFree: {}) }
+    ZStack {
+        Color.black.ignoresSafeArea()
+        HeaderSlide(onTryForFree: {})
+    }
 }

@@ -10,7 +10,6 @@ struct HeaderPager: View {
         }
         .tabViewStyle(.page)
         .indexViewStyle(.page(backgroundDisplayMode: .never))
-        .frame(height: 220)
     }
 }
 

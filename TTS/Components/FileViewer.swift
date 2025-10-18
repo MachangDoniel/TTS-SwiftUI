@@ -64,6 +64,10 @@ struct FileViewer: View {
             }
         }
         .onAppear {
+            // Only hard-stop if we’re switching to a different file
+            if tts.currentURL != fileURL {
+                tts.stop()
+            }
             if fileURL.pathExtension.lowercased() == "pdf" {
                 let text = extractText(from: fileURL)
                 extractedText = text
@@ -71,7 +75,6 @@ struct FileViewer: View {
                 // Restart if a new file is selected (different URL)
                 if tts.currentURL != fileURL {
                     // ✅ Hard reset: replace the AVSpeechSynthesizer to prevent leftover callbacks
-                    tts.stop()
                     tts.synthesizer.delegate = nil
                     tts.synthesizer = AVSpeechSynthesizer()
                     tts.synthesizer.delegate = tts
@@ -88,9 +91,6 @@ struct FileViewer: View {
                     }
                 } else if tts.sentences.isEmpty || tts.currentSentenceText.isEmpty || !tts.isSpeaking {
                     // Start if nothing is currently speaking
-                    tts.currentIndex = 0
-                    tts.currentWordRange = nil
-                    tts.currentWordInSentence = ""
                     tts.startReading(text)
                 }
             }
@@ -116,4 +116,3 @@ struct FileViewer: View {
 //#Preview {
 //    FileViewer(fileURL: URL(fileURLWithPath: "/path/to/sample.pdf"), tts: TTSPlayer())
 //}
-
