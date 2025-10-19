@@ -3,7 +3,6 @@
 //  TTS
 //
 //  Created by Doniel Tripura on 10/5/25.
-//  Updated for sentence + word tracking on 10/12/25.
 //
 
 import Foundation

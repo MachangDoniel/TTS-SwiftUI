@@ -1,3 +1,10 @@
+//
+//  HeaderSlide.swift
+//  TTS
+//
+//  Created by Doniel Tripura on 10/5/25.
+//
+
 import SwiftUI
 
 struct HeaderSlide: View {

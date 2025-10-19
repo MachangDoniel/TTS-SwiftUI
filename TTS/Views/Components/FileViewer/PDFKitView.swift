@@ -2,7 +2,7 @@
 //  PDFKitView.swift
 //  TTS
 //
-//  Updated 2025-10-12: dual highlights (sentence + word) + page cache
+//  Created by Doniel Tripura on 10/5/25.
 //
 
 import SwiftUI

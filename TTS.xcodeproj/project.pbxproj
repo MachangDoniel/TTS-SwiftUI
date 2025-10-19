@@ -10,9 +10,33 @@
 		D94AF8BE2E9146650017C37C /* TTS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TTS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		D95125C02EA4CE5400C202AD /* Exceptions for "TTS" folder in "TTS" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Utilities/URLHelpers.swift,
+			);
+			target = D94AF8BD2E9146650017C37C /* TTS */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		D95125C12EA4CE5400C202AD /* Exceptions for "TTS" folder in "Copy Bundle Resources" phase from "TTS" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			buildPhase = D94AF8BC2E9146650017C37C /* Resources */;
+			membershipExceptions = (
+				Utilities/URLHelpers.swift,
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		D94AF8C02E9146650017C37C /* TTS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D95125C02EA4CE5400C202AD /* Exceptions for "TTS" folder in "TTS" target */,
+				D95125C12EA4CE5400C202AD /* Exceptions for "TTS" folder in "Copy Bundle Resources" phase from "TTS" target */,
+			);
 			path = TTS;
 			sourceTree = "<group>";
 		};

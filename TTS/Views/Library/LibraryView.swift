@@ -1,3 +1,10 @@
+//
+//  LibraryView.swift
+//  TTS
+//
+//  Created by Doniel Tripura on 10/19/25.
+//
+
 import SwiftUI
 
 struct LibraryView: View {
@@ -130,138 +137,6 @@ struct LibraryView: View {
                 return ["png","jpg","jpeg","heic","gif","tiff","bmp","webp"].contains(ext)
             }
         }
-    }
-}
-
-// MARK: - Filter Enum
-enum FileFilter: String, CaseIterable {
-    case all = "All Files"
-    case pdf = "PDF"
-    case text = "Text"
-    case image = "Image"
-}
-
-// MARK: - Filter Bar
-struct FilterBar: View {
-    @Binding var selected: FileFilter
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(FileFilter.allCases, id: \.self) { filter in
-                    Button {
-                        selected = filter
-                    } label: {
-                        Text(filter.rawValue)
-                            .font(.system(size: 14, weight: .semibold))
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 14)
-                            .background(
-                                selected == filter ?
-                                Color.blue.opacity(0.9) :
-                                Color.white.opacity(0.1)
-                            )
-                            .clipShape(Capsule())
-                            .foregroundColor(selected == filter ? .white : .white.opacity(0.8))
-                    }
-                }
-            }
-            .padding(.horizontal, 2)
-        }
-    }
-}
-
-// MARK: - Empty State View
-struct EmptyLibraryView: View {
-    var body: some View {
-        VStack(spacing: 20) {
-            Spacer(minLength: 0)
-            Image(systemName: "tray.fill")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 90, height: 90)
-                .foregroundColor(.gray.opacity(0.7))
-                .padding(.bottom, 10)
-
-            Text("Add your first book to get started!")
-                .foregroundColor(.white)
-                .font(.system(size: 16, weight: .medium))
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
-// MARK: - File Viewer
-struct FileViewerView: View {
-    let item: RecentActivity
-
-    private func displayName(from item: RecentActivity) -> String {
-        if let nameChild = Mirror(reflecting: item).children.first(where: { $0.label == "fileName" }),
-           let name = nameChild.value as? String {
-            return name
-        }
-        if let urlChild = Mirror(reflecting: item).children.first(where: { $0.label == "url" }),
-           let url = urlChild.value as? URL {
-            return url.lastPathComponent
-        }
-        if let pathChild = Mirror(reflecting: item).children.first(where: { $0.label == "path" }),
-           let path = pathChild.value as? String {
-            return URL(fileURLWithPath: path).lastPathComponent
-        }
-        return "File"
-    }
-
-    private func fileURL(from item: RecentActivity) -> URL? {
-        let mirror = Mirror(reflecting: item)
-
-        // Try URL-typed properties first
-        if let urlChild = mirror.children.first(where: { $0.label == "url" }),
-           let url = urlChild.value as? URL {
-            return url
-        }
-        if let fileURLChild = mirror.children.first(where: { $0.label == "fileURL" || $0.label == "localURL" }),
-           let url = fileURLChild.value as? URL {
-            return url
-        }
-
-        // Try path-typed properties next
-        if let pathChild = mirror.children.first(where: { $0.label == "path" || $0.label == "filePath" }),
-           let path = pathChild.value as? String {
-            return URL(fileURLWithPath: path)
-        }
-
-        return nil
-    }
-
-    private func fileExists(at url: URL) -> Bool {
-        FileManager.default.fileExists(atPath: url.path)
-    }
-
-    var body: some View {
-        VStack(spacing: 16) {
-            if let url = fileURL(from: item) {
-                // Placeholder viewer; integrate your real viewer here
-                Text("Viewing: \(url.lastPathComponent)")
-                    .foregroundColor(.white)
-                Text(url.path)
-                    .font(.footnote)
-                    .foregroundColor(.white.opacity(0.7))
-                    .multilineTextAlignment(.center)
-                    .padding()
-                Text(fileExists(at: url) ? "File exists on disk" : "File not found on disk")
-                    .font(.footnote)
-                    .foregroundColor(.white.opacity(0.6))
-            } else {
-                Text("Unable to open file")
-                    .foregroundColor(.white)
-            }
-            Spacer()
-        }
-        .navigationTitle(displayName(from: item))
-        .navigationBarTitleDisplayMode(.inline)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black.ignoresSafeArea())
     }
 }
 

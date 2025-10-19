@@ -1,130 +1,26 @@
-// RecentActivity.swift
-// Local model + store for recent activities
+//
+//  RecentStore.swift
+//  TTS
+//
+//  Created by Doniel Tripura on 10/19/25.
+//
 
-import Foundation
 import SwiftUI
 import Combine
 import CoreData
 import PDFKit
 import UIKit
 
-// MARK: - Model
-struct RecentActivity: Identifiable, Codable, Equatable {
-    enum Kind: String, Codable, CaseIterable {
-        case files, gdrive, photos, scan, dbox, book, text, link
-
-        var displayName: String {
-            switch self {
-            case .files: return "Files"
-            case .gdrive: return "GDrive"
-            case .photos: return "Photo"
-            case .scan: return "Scan"
-            case .dbox: return "Dbox"
-            case .book: return "Book"
-            case .text: return "Type"
-            case .link: return "Link"
-            }
-        }
-    }
-
-    let id: UUID
-    var title: String // already sanitized for display
-    var sourcePath: String?
-    var kind: Kind
-    var createdAt: Date
-    var thumbnailData: Data? // optional small preview (e.g., PDF first page)
-    var bookmarkData: Data? // security-scoped bookmark for external files
-
-    // Derived file extension and category, based on sourcePath or title
-    var fileExtensionLowercased: String? {
-        // Prefer sourcePath if available
-        if let sp = sourcePath, !sp.isEmpty {
-            // Try to parse as URL first
-            if let url = URL(string: sp), url.scheme != nil {
-                let ext = url.pathExtension
-                if !ext.isEmpty { return ext.lowercased() }
-            }
-            // Fall back to path string
-            if let ext = sp.split(separator: ".").last, sp.contains(".") {
-                return String(ext).lowercased()
-            }
-        }
-        // Fallback: try to infer from title if it contains an extension
-        if let ext = title.split(separator: ".").last, title.contains(".") {
-            return String(ext).lowercased()
-        }
-        return nil
-    }
-
-    enum FileCategory {
-        case pdf
-        case text
-        case image
-        case other
-    }
-
-    var fileCategory: FileCategory {
-        if kind == .text { return .text }
-        if kind == .photos { return .image }
-        guard let ext = fileExtensionLowercased else { return .other }
-        if ext == "pdf" { return .pdf }
-        if ext == "txt" { return .text }
-        if ["png", "jpg", "jpeg", "heic"].contains(ext) { return .image }
-        return .other
-    }
-
-    init(id: UUID = UUID(), title: String, sourcePath: String? = nil, kind: Kind, createdAt: Date = Date(), thumbnailData: Data? = nil, bookmarkData: Data? = nil) {
-        self.id = id
-        self.title = title
-        self.sourcePath = sourcePath
-        self.kind = kind
-        self.createdAt = createdAt
-        self.thumbnailData = thumbnailData
-        self.bookmarkData = bookmarkData
-    }
-
-    // Resolve a usable URL for this activity, preferring security-scoped bookmarks
-    var resolvedURL: URL? {
-        // 1) Try bookmark if available (for external files)
-        if let bookmarkData {
-            var isStale = false
-            if let url = try? URL(resolvingBookmarkData: bookmarkData,
-                                  options: [.withoutUI],
-                                  relativeTo: nil,
-                                  bookmarkDataIsStale: &isStale) {
-                return url
-            }
-        }
-
-        // 2) Fall back to sourcePath
-        guard let sp = sourcePath, !sp.isEmpty else { return nil }
-
-        // If it's a proper URL string (has a scheme), use it
-        if let url = URL(string: sp), url.scheme != nil {
-            return url
-        }
-
-        // Otherwise treat it as a local file path
-        return URL(fileURLWithPath: sp)
-    }
-
-    // Convenience for checking disk existence when resolvedURL is file URL
-    var fileExistsOnDisk: Bool {
-        guard let url = resolvedURL, url.isFileURL else { return false }
-        return FileManager.default.fileExists(atPath: url.path)
-    }
-}
-
 // MARK: - Store (Core Data persistence)
 final class RecentStore: ObservableObject {
     @Published private(set) var items: [RecentActivity] = []
-
+    
     private let maxItems = 50
-
+    
     // MARK: - Core Data stack (programmatic model)
     private let container: NSPersistentContainer
     private let context: NSManagedObjectContext
-
+    
     init() {
         let model = Self.buildModel()
         container = NSPersistentContainer(name: "RecentModel", managedObjectModel: model)
@@ -134,7 +30,7 @@ final class RecentStore: ObservableObject {
         description.type = NSSQLiteStoreType
         description.shouldAddStoreAsynchronously = false
         container.persistentStoreDescriptions = [description]
-
+        
         var loadError: Error?
         container.loadPersistentStores { _, error in
             loadError = error
@@ -146,67 +42,67 @@ final class RecentStore: ObservableObject {
         context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
         load()
     }
-
+    
     private static func buildModel() -> NSManagedObjectModel {
         let model = NSManagedObjectModel()
-
+        
         // Entity: RecentActivityEntity
         let entity = NSEntityDescription()
         entity.name = "RecentActivityEntity"
         entity.managedObjectClassName = "NSManagedObject"
-
+        
         // Attributes
         let idAttr = NSAttributeDescription()
         idAttr.name = "id"
         idAttr.attributeType = .UUIDAttributeType
         idAttr.isOptional = false
-
+        
         let titleAttr = NSAttributeDescription()
         titleAttr.name = "title"
         titleAttr.attributeType = .stringAttributeType
         titleAttr.isOptional = false
-
+        
         let sourcePathAttr = NSAttributeDescription()
         sourcePathAttr.name = "sourcePath"
         sourcePathAttr.attributeType = .stringAttributeType
         sourcePathAttr.isOptional = true
-
+        
         let kindAttr = NSAttributeDescription()
         kindAttr.name = "kind"
         kindAttr.attributeType = .stringAttributeType
         kindAttr.isOptional = false
-
+        
         let createdAtAttr = NSAttributeDescription()
         createdAtAttr.name = "createdAt"
         createdAtAttr.attributeType = .dateAttributeType
         createdAtAttr.isOptional = false
-
+        
         let thumbAttr = NSAttributeDescription()
         thumbAttr.name = "thumbnailData"
         thumbAttr.attributeType = .binaryDataAttributeType
         thumbAttr.isOptional = true
-
+        
         let bookmarkAttr = NSAttributeDescription()
         bookmarkAttr.name = "bookmarkData"
         bookmarkAttr.attributeType = .binaryDataAttributeType
         bookmarkAttr.isOptional = true
-
+        
         entity.properties = [idAttr, titleAttr, sourcePathAttr, kindAttr, createdAtAttr, thumbAttr, bookmarkAttr]
-
+        
         // No uniqueness constraints; we'll dedupe manually for flexible logic
         model.entities = [entity]
         return model
     }
-
+    
     // MARK: - Public API (unchanged)
-
-    func add(title: String, kind: RecentActivity.Kind) {
+    
+    func add(title: String, kind: ImportSource) {
         let display = sanitizeTitle(title)
         let activity = RecentActivity(title: display, kind: kind)
         dedupAndInsert(activity)
     }
-
-    func add(fileURL: URL, kind: RecentActivity.Kind) {
+    
+    func add(fileURL: URL, kind: ImportSource) {
         let base = fileURL.deletingPathExtension().lastPathComponent
         let display = sanitizeTitle(base)
         var thumb: Data? = nil
@@ -221,8 +117,8 @@ final class RecentStore: ObservableObject {
                                       thumbnailData: thumb)
         dedupAndInsert(activity)
     }
-
-    func addExternal(fileURL: URL, bookmarkData: Data, kind: RecentActivity.Kind) {
+    
+    func addExternal(fileURL: URL, bookmarkData: Data, kind: ImportSource) {
         let base = fileURL.deletingPathExtension().lastPathComponent
         let display = sanitizeTitle(base)
         var thumb: Data? = nil
@@ -238,7 +134,7 @@ final class RecentStore: ObservableObject {
                                       bookmarkData: bookmarkData)
         dedupAndInsert(activity)
     }
-
+    
     func addLink(url: URL, title: String? = nil) {
         let displayTitle: String
         if let title = title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -252,14 +148,14 @@ final class RecentStore: ObservableObject {
         let activity = RecentActivity(title: displayTitle, sourcePath: url.absoluteString, kind: .link)
         dedupAndInsert(activity)
     }
-
+    
     func addText(content: String) {
         let firstLine = content.split(separator: "\n").first.map(String.init) ?? content
         let display = sanitizeTitle(firstLine)
         let activity = RecentActivity(title: display, kind: .text)
         dedupAndInsert(activity)
     }
-
+    
     func remove(_ id: UUID) {
         let fetch: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "RecentActivityEntity")
         fetch.predicate = NSPredicate(format: "id == %@", id as CVarArg)
@@ -272,7 +168,7 @@ final class RecentStore: ObservableObject {
             // Handle errors as needed
         }
     }
-
+    
     func clear() {
         let fetch: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "RecentActivityEntity")
         let batch = NSBatchDeleteRequest(fetchRequest: fetch)
@@ -284,25 +180,25 @@ final class RecentStore: ObservableObject {
             // Handle errors as needed
         }
     }
-
+    
     // Rename activity title and underlying file if applicable
     func rename(id: UUID, newTitle: String) {
         let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         let display = sanitizeTitle(trimmed)
-
+        
         let fr = NSFetchRequest<NSManagedObject>(entityName: "RecentActivityEntity")
         fr.predicate = NSPredicate(format: "id == %@", id as CVarArg)
         fr.fetchLimit = 1
         do {
             guard let obj = try context.fetch(fr).first else { return }
-            let kindRaw = (obj.value(forKey: "kind") as? String) ?? RecentActivity.Kind.files.rawValue
-            let kind = RecentActivity.Kind(rawValue: kindRaw) ?? .files
+            let kindRaw = (obj.value(forKey: "kind") as? String) ?? ImportSource.files.rawValue
+            let kind = ImportSource(rawValue: kindRaw) ?? .files
             let oldTitle = (obj.value(forKey: "title") as? String) ?? display
             let oldSource = obj.value(forKey: "sourcePath") as? String
-
+            
             var updatedSource = oldSource
-
+            
             // If it's a file URL, attempt to rename the file on disk to match new title
             if let sp = oldSource, !sp.isEmpty, FileManager.default.fileExists(atPath: sp) {
                 let oldURL = URL(fileURLWithPath: sp)
@@ -324,11 +220,11 @@ final class RecentStore: ObservableObject {
                     }
                 }
             }
-
+            
             // Update Core Data object
             obj.setValue(display, forKey: "title")
             obj.setValue(updatedSource, forKey: "sourcePath")
-
+            
             // Re-apply dedupe semantics: remove any other items that now conflict with this (kind, sourcePath/title)
             // Delete duplicates except this id
             let dupFetch: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "RecentActivityEntity")
@@ -339,14 +235,14 @@ final class RecentStore: ObservableObject {
             }
             let dups = try context.fetch(dupFetch) as? [NSManagedObject] ?? []
             for d in dups { context.delete(d) }
-
+            
             try context.save()
             load()
         } catch {
             // handle error if needed
         }
     }
-
+    
     // Delete activity; optionally remove underlying file
     func deleteItem(id: UUID, removeFile: Bool = false) {
         let fr = NSFetchRequest<NSManagedObject>(entityName: "RecentActivityEntity")
@@ -365,9 +261,9 @@ final class RecentStore: ObservableObject {
             // ignore
         }
     }
-
+    
     // MARK: - Private helpers
-
+    
     private func sanitizeTitle(_ raw: String) -> String {
         let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if s.isEmpty { return "Untitled" }
@@ -380,7 +276,7 @@ final class RecentStore: ObservableObject {
         }
         return candidate
     }
-
+    
     private func dedupAndInsert(_ activity: RecentActivity) {
         // Delete duplicates according to sourcePath if present, else by (kind,title)
         let fetch: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "RecentActivityEntity")
@@ -389,11 +285,11 @@ final class RecentStore: ObservableObject {
         } else {
             fetch.predicate = NSPredicate(format: "kind == %@ AND title ==[c] %@", activity.kind.rawValue, activity.title)
         }
-
+        
         do {
             let dups = try context.fetch(fetch) as? [NSManagedObject] ?? []
             for obj in dups { context.delete(obj) }
-
+            
             // Insert new object
             let entity = NSEntityDescription.entity(forEntityName: "RecentActivityEntity", in: context)!
             let obj = NSManagedObject(entity: entity, insertInto: context)
@@ -404,7 +300,7 @@ final class RecentStore: ObservableObject {
             obj.setValue(activity.createdAt, forKey: "createdAt")
             obj.setValue(activity.thumbnailData, forKey: "thumbnailData")
             obj.setValue(activity.bookmarkData, forKey: "bookmarkData")
-
+            
             // Trim to maxItems by deleting older ones beyond limit
             try context.save()
             trimIfNeeded()
@@ -413,7 +309,7 @@ final class RecentStore: ObservableObject {
             // Handle error as needed
         }
     }
-
+    
     private func trimIfNeeded() {
         // Fetch count and delete older items beyond maxItems
         let fr = NSFetchRequest<NSManagedObject>(entityName: "RecentActivityEntity")
@@ -429,7 +325,7 @@ final class RecentStore: ObservableObject {
             // ignore
         }
     }
-
+    
     private func load() {
         let fr = NSFetchRequest<NSManagedObject>(entityName: "RecentActivityEntity")
         fr.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
@@ -440,8 +336,8 @@ final class RecentStore: ObservableObject {
                 let id = (obj.value(forKey: "id") as? UUID) ?? UUID()
                 let title = (obj.value(forKey: "title") as? String) ?? "Untitled"
                 let sourcePath = obj.value(forKey: "sourcePath") as? String
-                let kindRaw = (obj.value(forKey: "kind") as? String) ?? RecentActivity.Kind.files.rawValue
-                let kind = RecentActivity.Kind(rawValue: kindRaw) ?? .files
+                let kindRaw = (obj.value(forKey: "kind") as? String) ?? ImportSource.files.rawValue
+                let kind = ImportSource(rawValue: kindRaw) ?? .files
                 let createdAt = (obj.value(forKey: "createdAt") as? Date) ?? Date()
                 let thumb = obj.value(forKey: "thumbnailData") as? Data
                 let bookmarkData = obj.value(forKey: "bookmarkData") as? Data
@@ -455,4 +351,3 @@ final class RecentStore: ObservableObject {
         }
     }
 }
-

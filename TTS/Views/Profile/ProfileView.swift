@@ -145,59 +145,6 @@ struct ProfileView: View {
     }
 }
 
-// MARK: - Reusable Components
-
-struct InfoRow: View {
-    let label: String
-    let value: String
-    
-    var body: some View {
-        HStack {
-            Text(label)
-                .foregroundColor(.white.opacity(0.9))
-            Spacer()
-            Text(value)
-                .foregroundColor(.white.opacity(0.7))
-            Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white.opacity(0.3))
-        }
-        .padding(.horizontal)
-        .frame(height: 48)
-    }
-}
-
-struct SettingsRow: View {
-    let title: String
-    var action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack {
-                Text(title)
-                    .foregroundColor(.white.opacity(0.9))
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.3))
-            }
-            .padding(.horizontal)
-            .frame(height: 48)
-        }
-    }
-}
-
-// MARK: - Share Sheet
-struct ShareSheet: UIViewControllerRepresentable {
-    var activityItems: [Any]
-    
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
-    }
-    
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-}
-
 #Preview {
     ZStack {
         Color.black.ignoresSafeArea()
