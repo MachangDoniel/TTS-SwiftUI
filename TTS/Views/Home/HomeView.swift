@@ -1,5 +1,5 @@
 //
-//  HomeScreenView.swift
+//  HomeView.swift
 //  TTS
 //
 //  Created by Doniel Tripura on 10/19/25.
@@ -8,7 +8,7 @@
 import SwiftUI
 import UIKit
 
-struct HomeScreenView: View {
+struct HomeView: View {
     // Callbacks for actions
     var onPickFiles: (() -> Void)?
     var onPickGDrive: (() -> Void)?
@@ -166,7 +166,7 @@ struct HomeScreenView: View {
 #Preview {
     ZStack {
         Color.black.ignoresSafeArea()
-        HomeScreenView()
+        HomeView()
             .environmentObject(RecentStore())
     }
 }

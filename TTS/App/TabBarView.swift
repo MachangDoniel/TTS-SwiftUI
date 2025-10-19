@@ -18,7 +18,7 @@ struct TabBarView: View {
         NavigationStack {
             TabView(selection: $selectedTab) {
                 // Home Tab
-                HomeScreenView(
+                HomeView(
                     onPickFiles: { showDocumentPicker = true },
                     onPickGDrive: { /* TODO */ },
                     onPickPhotos: { /* TODO */ },

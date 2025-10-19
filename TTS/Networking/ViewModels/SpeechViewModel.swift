@@ -1,0 +1,92 @@
+//
+//  SpeechViewModel.swift
+//  TTS
+//
+//  Created by Doniel Tripura on 10/20/25.
+//
+
+
+//
+//  SpeechViewModel.swift
+//  TTS
+//
+//  Created by Doniel Tripura on 10/20/25.
+//
+
+import Foundation
+import Combine
+
+@MainActor
+final class SpeechViewModel: ObservableObject {
+    @Published var speechData: SpeechGenerationData?
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+    
+    func generateSpeech(taskId: String, requestId: String?, inputText: String, order: Int) async {
+        isLoading = true
+        defer { isLoading = false }
+        
+        let body = SpeechGenerationRequest(
+            taskId: taskId,
+            requestId: requestId,
+            inputText: inputText,
+            order: order
+        )
+        
+        do {
+            let response: SpeechGenerationResponse = try await APIClient.shared.request(
+                APIEndpoints.speechGeneration,
+                body: body
+            )
+            speechData = response.data
+            
+            if let url = response.data?.downloadUrl {
+                print("✅ Download URL:", url)
+            } else {
+                print("ℹ️ Speech generation in progress, URL not ready yet.")
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+            print("❌ Failed to generate speech:", error.localizedDescription)
+        }
+    }
+    
+    func checkStatus(
+        taskId: String,
+        requestId: String,
+        inputText: String,
+        order: Int
+    ) async {
+        isLoading = true
+        defer { isLoading = false }
+        
+        let body = SpeechGenerationRequest(
+            taskId: taskId,
+            requestId: requestId,
+            inputText: inputText,
+            order: order
+        )
+        
+        do {
+            let response: SpeechGenerationResponse = try await APIClient.shared.request(
+                APIEndpoints.jobStatus,
+                body: body
+            )
+            speechData = response.data
+            
+            // ✅ Safely unwrap optional data
+            if let data = response.data {
+                let status = data.status ?? "Unknown"
+                let progressText = data.progress != nil ? "\(data.progress!)%" : "N/A"
+                
+                print("✅ Job Status: \(status), Progress: \(progressText)")
+            } else {
+                print("⚠️ No job data returned")
+            }
+            
+        } catch {
+            errorMessage = error.localizedDescription
+            print("❌ Failed to fetch job status:", error.localizedDescription)
+        }
+    }
+}
