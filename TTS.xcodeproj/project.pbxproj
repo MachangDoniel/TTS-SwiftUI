@@ -81,7 +81,6 @@
 				Views/Components/Header/HeaderPager.swift,
 				Views/Components/Header/HeaderSlide.swift,
 				Views/Components/TTS/MiniTTSBar.swift,
-				Views/Components/TTS/TTSControlsView.swift,
 				Views/Home/HomeView.swift,
 				Views/Home/ImportTile.swift,
 				Views/Library/EmptyLibraryView.swift,
