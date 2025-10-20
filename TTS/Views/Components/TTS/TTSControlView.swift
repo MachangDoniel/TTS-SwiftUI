@@ -7,8 +7,9 @@
 
 import SwiftUI
 
-struct TTSControlsView: View {
+struct TTSControlView: View {
     @ObservedObject var tts: TTSPlayer
+    @State private var showLanguagePicker = false
     let text: String
     
     @State private var playbackProgress: Double = 0.0
@@ -38,7 +39,7 @@ struct TTSControlsView: View {
             HStack(spacing: 32) {
                 // Language / Flag Button (placeholder)
                 Button(action: {
-                    // TODO: open language picker
+                    showLanguagePicker.toggle()
                 }) {
                     Image("liberia_flag") // Replace with your asset or SF symbol
                         .resizable()
@@ -107,11 +108,16 @@ struct TTSControlsView: View {
         .padding(.horizontal)
         .padding(.bottom)
         .preferredColorScheme(.dark)
+        .sheet(isPresented: $showLanguagePicker) {
+            LanguagePickerView()
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
     }
 }
 
 #Preview {
-    TTSControlsView(
+    TTSControlView(
         tts: TTSPlayer(),
         text: "Hello world. This is a test."
     )

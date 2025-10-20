@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct MiniTTSBar: View {
+struct MiniTTSControlView: View {
     @ObservedObject var ttsPlayer: TTSPlayer
     let title: String
     var onTap: (() -> Void)? = nil

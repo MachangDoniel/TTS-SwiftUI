@@ -60,7 +60,7 @@ struct FileViewer: View {
             }
             
             if !extractedText.isEmpty || fileURL.pathExtension.lowercased() == "pdf" {
-                TTSControlsView(tts: tts, text: extractedText)
+                TTSControlView(tts: tts, text: extractedText)
             }
         }
         .onAppear {

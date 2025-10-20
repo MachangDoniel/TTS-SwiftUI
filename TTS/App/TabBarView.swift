@@ -126,7 +126,7 @@ struct TabBarView: View {
             }
             .overlay(alignment: .bottom) {
                 if tts.hasActiveItem {
-                    MiniTTSBar(ttsPlayer: tts, title: tts.currentTitle ?? "Now Playing", onTap: {
+                    MiniTTSControlView(ttsPlayer: tts, title: tts.currentTitle ?? "Now Playing", onTap: {
                         if let url = tts.currentURL {
                             selectedTab = 0
                             selectedDocumentURL = url

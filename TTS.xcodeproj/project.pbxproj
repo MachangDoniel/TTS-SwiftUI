@@ -47,6 +47,7 @@
 		D95125C02EA4CE5400C202AD /* Exceptions for "TTS" folder in "TTS" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Extension/Color.swift,
 				Utilities/URLHelpers.swift,
 			);
 			target = D94AF8BD2E9146650017C37C /* TTS */;
@@ -58,9 +59,11 @@
 				App/TabBarView.swift,
 				App/TTSApp.swift,
 				Assets.xcassets,
+				Extension/Color.swift,
 				Models/FileFilter.swift,
 				Models/ImportSource.swift,
 				Models/RecentActivity.swift,
+				Models/Voice.swift,
 				Networking/APIClient.swift,
 				Networking/APIEndpoints.swift,
 				Networking/Models/AuthModels.swift,
@@ -80,7 +83,6 @@
 				Views/Components/FileViewer/PDFKitView.swift,
 				Views/Components/Header/HeaderPager.swift,
 				Views/Components/Header/HeaderSlide.swift,
-				Views/Components/TTS/MiniTTSBar.swift,
 				Views/Home/HomeView.swift,
 				Views/Home/ImportTile.swift,
 				Views/Library/EmptyLibraryView.swift,
@@ -102,7 +104,15 @@
 			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
 			buildPhase = D94AF8BC2E9146650017C37C /* Resources */;
 			membershipExceptions = (
+				Extension/Color.swift,
 				Utilities/URLHelpers.swift,
+			);
+		};
+		D964FEC12EA63CE0006A2573 /* Exceptions for "TTS" folder in "Copy Bundle Resources" phase from "TTS Prod" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			buildPhase = D964FBD62EA5565F006A2573 /* Resources */;
+			membershipExceptions = (
+				Extension/Color.swift,
 			);
 		};
 /* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
@@ -114,6 +124,7 @@
 				D95125C02EA4CE5400C202AD /* Exceptions for "TTS" folder in "TTS" target */,
 				D95125C12EA4CE5400C202AD /* Exceptions for "TTS" folder in "Copy Bundle Resources" phase from "TTS" target */,
 				D964FBDC2EA5565F006A2573 /* Exceptions for "TTS" folder in "TTS Prod" target */,
+				D964FEC12EA63CE0006A2573 /* Exceptions for "TTS" folder in "Copy Bundle Resources" phase from "TTS Prod" target */,
 			);
 			path = TTS;
 			sourceTree = "<group>";
