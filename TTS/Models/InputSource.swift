@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-enum ImportSource: String, CaseIterable, Identifiable, Codable {
+enum InputSource: String, CaseIterable, Identifiable, Codable {
     case files, gdrive, photos, scan, dbox, book, text, link
 
     var id: String { rawValue }
@@ -51,7 +51,7 @@ enum ImportSource: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    static var defaultOrder: [ImportSource] {
+    static var defaultOrder: [InputSource] {
         return [.files, .gdrive, .photos, .scan, .dbox, .book, .text, .link]
     }
     

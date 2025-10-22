@@ -85,14 +85,14 @@ struct HomeView: View {
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 4), spacing: 16) {
                 // If you have a picked file URL, call recentStore.add(fileURL: url, kind: .files)
-                ImportTile(icon: "File", title: "Files", action: { onPickFiles?() })
-                ImportTile(icon: "GDrive", title: "GDrive", tint: .green, action: { onPickGDrive?() })
-                ImportTile(icon: "photo.fill.on.rectangle.fill", title: "Photo", tint: .yellow, action: { onPickPhotos?() })
-                ImportTile(icon: "Camera", title: "Scan", action: { onScan?() })
-                ImportTile(icon: "Dbox", title: "Dbox", tint: .blue, action: { onPickDropbox?() })
-                ImportTile(icon: "Book", title: "Book", action: { onPickBook?() })
-                ImportTile(icon: "Text", title: "Type", action: { onTypeText?() })
-                ImportTile(icon: "Link", title: "Link", action: { onPasteLink?() })
+                InputSourceTile(icon: "File", title: "Files", action: { onPickFiles?() })
+                InputSourceTile(icon: "GDrive", title: "GDrive", tint: .green, action: { onPickGDrive?() })
+                InputSourceTile(icon: "photo.fill.on.rectangle.fill", title: "Photo", tint: .yellow, action: { onPickPhotos?() })
+                InputSourceTile(icon: "Camera", title: "Scan", action: { onScan?() })
+                InputSourceTile(icon: "Dbox", title: "Dbox", tint: .blue, action: { onPickDropbox?() })
+                InputSourceTile(icon: "Book", title: "Book", action: { onPickBook?() })
+                InputSourceTile(icon: "Text", title: "Type", action: { onTypeText?() })
+                InputSourceTile(icon: "Link", title: "Link", action: { onPasteLink?() })
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 20)

@@ -9,7 +9,12 @@ import SwiftUI
 
 struct TabBarView: View {
     @State private var selectedTab: Int = 0
+    
     @State private var showDocumentPicker: Bool = false
+    @State private var showTextInput = false
+    @State private var showCameraReader = false
+    @State private var showPhotoReader = false
+    
     @State private var selectedDocumentURL: URL?
     @StateObject private var recentStore = RecentStore()
     @StateObject private var tts = TTSPlayer()
@@ -21,11 +26,11 @@ struct TabBarView: View {
                 HomeView(
                     onPickFiles: { showDocumentPicker = true },
                     onPickGDrive: { /* TODO */ },
-                    onPickPhotos: { /* TODO */ },
-                    onScan: { /* TODO */ },
+                    onPickPhotos: { showPhotoReader = true },
+                    onScan: { showCameraReader = true },
                     onPickDropbox: { /* TODO */ },
                     onPickBook: { /* TODO */ },
-                    onTypeText: { /* TODO */ },
+                    onTypeText: { showTextInput = true },
                     onPasteLink: { /* TODO */ },
                     onTryForFree: { /* TODO */ },
                     onOpenRecent: { item in
@@ -93,7 +98,6 @@ struct TabBarView: View {
                 DocumentPicker { url in
                     var resolvedURL: URL? = nil
                     if url.startAccessingSecurityScopedResource() {
-                        defer { url.stopAccessingSecurityScopedResource() }
                         do {
                             let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
                             // Store recent using bookmark (no full copy)
@@ -101,6 +105,8 @@ struct TabBarView: View {
                             resolvedURL = url
                         } catch {
                             print("Failed to create bookmark: \(error)")
+                            // Even if bookmark fails, still try to open immediately with active access
+                            resolvedURL = url
                         }
                     }
                     // Navigate to the picked file immediately if available
@@ -111,13 +117,55 @@ struct TabBarView: View {
                     }
                 }
             }
+            .sheet(isPresented: $showTextInput) {
+                TextInputView(tts: tts) { url in
+                    // Add to recent and open file
+                    do {
+                        let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+                        recentStore.addExternal(fileURL: url, bookmarkData: bookmark, kind: .files)
+                    } catch {
+                        print("Bookmark error:", error.localizedDescription)
+                        // Fallback: still add without bookmark if it failed
+                        recentStore.addExternal(fileURL: url, bookmarkData: Data(), kind: .files)
+                    }
+                    // Stop any ongoing speech and open the new text file
+                    tts.stop()
+                    selectedTab = 0
+                    selectedDocumentURL = url
+                }
+            }
+            .sheet(isPresented: $showCameraReader) {
+                ImageReaderView(tts: tts, source: .camera) { url in
+                    do {
+                        let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+                        recentStore.addExternal(fileURL: url, bookmarkData: bookmark, kind: .scan)
+                    } catch {
+                        print("Bookmark error (scan):", error.localizedDescription)
+                        // Fallback: still add without bookmark if it failed
+                        recentStore.addExternal(fileURL: url, bookmarkData: Data(), kind: .scan)
+                    }
+                }
+            }
+            .sheet(isPresented: $showPhotoReader) {
+                ImageReaderView(tts: tts, source: .gallery) { url in
+                    do {
+                        let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+                        recentStore.addExternal(fileURL: url, bookmarkData: bookmark, kind: .photos)
+                    } catch {
+                        print("Bookmark error (photos):", error.localizedDescription)
+                        // Fallback: still add without bookmark if it failed
+                        recentStore.addExternal(fileURL: url, bookmarkData: Data(), kind: .photos)
+                    }
+                }
+            }
+            
             // Navigation to FileViewer when a document is picked
             .navigationDestination(isPresented: Binding(
                 get: { selectedDocumentURL != nil },
                 set: { if !$0 { selectedDocumentURL = nil } }
             )) {
                 if let url = selectedDocumentURL {
-                    FileViewer(fileURL: url, tts: tts)
+                    AccessingFileViewer(url: url, tts: tts)
                         .navigationTitle(url.lastPathComponent)
                         .navigationBarTitleDisplayMode(.inline)
                 } else {
@@ -165,6 +213,32 @@ struct TabBarView: View {
             }
         }
         return localURL
+    }
+
+    // Helper that ensures security-scoped access while viewing the file
+    private struct AccessingFileViewer: View {
+        let url: URL
+        let tts: TTSPlayer
+        @State private var didStartAccess = false
+
+        var body: some View {
+            FileViewer(fileURL: url, tts: tts)
+                .onAppear {
+                    // Ensure we have access when presented from Files app
+                    if !didStartAccess {
+                        if url.startAccessingSecurityScopedResource() {
+                            didStartAccess = true
+                        }
+                    }
+                }
+                .onDisappear {
+                    // Release access when leaving the viewer
+                    if didStartAccess {
+                        url.stopAccessingSecurityScopedResource()
+                        didStartAccess = false
+                    }
+                }
+        }
     }
 }
 

@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		D95125CC2EA52A6600C202AD /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = D95125CB2EA52A6600C202AD /* Alamofire */; };
+		D964002D2EA80491006A2573 /* Mantis in Frameworks */ = {isa = PBXBuildFile; productRef = D964002C2EA80491006A2573 /* Mantis */; };
+		D964002F2EA80497006A2573 /* Mantis in Frameworks */ = {isa = PBXBuildFile; productRef = D964002E2EA80497006A2573 /* Mantis */; };
 		D964FBC82EA5469A006A2573 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = D964FBC72EA5469A006A2573 /* GoogleSignIn */; };
 		D964FBCA2EA5469A006A2573 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = D964FBC92EA5469A006A2573 /* GoogleSignInSwift */; };
 		D964FBD32EA5565F006A2573 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = D964FBD02EA5565F006A2573 /* GoogleSignInSwift */; };
@@ -61,7 +63,7 @@
 				Assets.xcassets,
 				Extension/Color.swift,
 				Models/FileFilter.swift,
-				Models/ImportSource.swift,
+				Models/InputSource.swift,
 				Models/RecentActivity.swift,
 				Models/Voice.swift,
 				Networking/APIClient.swift,
@@ -78,13 +80,17 @@
 				Views/Components/BottomSheet/BottomSheet.swift,
 				Views/Components/BottomSheet/BottomSheetOptionRow.swift,
 				Views/Components/Card/RecentRow.swift,
+				Views/Components/FileViewer/CameraReaderView.swift,
 				Views/Components/FileViewer/FileViewer.swift,
 				Views/Components/FileViewer/ImagePicker.swift,
+				Views/Components/FileViewer/ImageReaderView.swift,
 				Views/Components/FileViewer/PDFKitView.swift,
+				Views/Components/FileViewer/PhotoReaderView.swift,
+				Views/Components/FileViewer/TextInputView.swift,
 				Views/Components/Header/HeaderPager.swift,
 				Views/Components/Header/HeaderSlide.swift,
 				Views/Home/HomeView.swift,
-				Views/Home/ImportTile.swift,
+				Views/Home/InputSourceTile.swift,
 				Views/Library/EmptyLibraryView.swift,
 				Views/Library/FileViewerView.swift,
 				Views/Library/FilterBar.swift,
@@ -138,6 +144,7 @@
 			files = (
 				D964FBCA2EA5469A006A2573 /* GoogleSignInSwift in Frameworks */,
 				D95125CC2EA52A6600C202AD /* Alamofire in Frameworks */,
+				D964002D2EA80491006A2573 /* Mantis in Frameworks */,
 				D964FBC82EA5469A006A2573 /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -148,6 +155,7 @@
 			files = (
 				D964FBD32EA5565F006A2573 /* GoogleSignInSwift in Frameworks */,
 				D964FBD42EA5565F006A2573 /* Alamofire in Frameworks */,
+				D964002F2EA80497006A2573 /* Mantis in Frameworks */,
 				D964FBD52EA5565F006A2573 /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -159,6 +167,7 @@
 			isa = PBXGroup;
 			children = (
 				D94AF8C02E9146650017C37C /* TTS */,
+				D964FF772EA7F575006A2573 /* Frameworks */,
 				D94AF8BF2E9146650017C37C /* Products */,
 			);
 			sourceTree = "<group>";
@@ -170,6 +179,13 @@
 				D964FBDB2EA5565F006A2573 /* TTS Prod.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		D964FF772EA7F575006A2573 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -196,6 +212,7 @@
 				D95125CB2EA52A6600C202AD /* Alamofire */,
 				D964FBC72EA5469A006A2573 /* GoogleSignIn */,
 				D964FBC92EA5469A006A2573 /* GoogleSignInSwift */,
+				D964002C2EA80491006A2573 /* Mantis */,
 			);
 			productName = TTS;
 			productReference = D94AF8BE2E9146650017C37C /* TTS.app */;
@@ -222,6 +239,7 @@
 				D964FBCC2EA5565F006A2573 /* Alamofire */,
 				D964FBCE2EA5565F006A2573 /* GoogleSignIn */,
 				D964FBD02EA5565F006A2573 /* GoogleSignInSwift */,
+				D964002E2EA80497006A2573 /* Mantis */,
 			);
 			productName = TTS;
 			productReference = D964FBDB2EA5565F006A2573 /* TTS Prod.app */;
@@ -257,6 +275,7 @@
 			packageReferences = (
 				D95125CA2EA52A6600C202AD /* XCRemoteSwiftPackageReference "Alamofire" */,
 				D964FBC62EA5469A006A2573 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				D964002B2EA80478006A2573 /* XCRemoteSwiftPackageReference "Mantis" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D94AF8BF2E9146650017C37C /* Products */;
@@ -609,6 +628,14 @@
 				minimumVersion = 5.10.2;
 			};
 		};
+		D964002B2EA80478006A2573 /* XCRemoteSwiftPackageReference "Mantis" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/guoyingtao/Mantis.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.3.0;
+			};
+		};
 		D964FBC62EA5469A006A2573 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
@@ -640,6 +667,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D95125CA2EA52A6600C202AD /* XCRemoteSwiftPackageReference "Alamofire" */;
 			productName = Alamofire;
+		};
+		D964002C2EA80491006A2573 /* Mantis */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D964002B2EA80478006A2573 /* XCRemoteSwiftPackageReference "Mantis" */;
+			productName = Mantis;
+		};
+		D964002E2EA80497006A2573 /* Mantis */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D964002B2EA80478006A2573 /* XCRemoteSwiftPackageReference "Mantis" */;
+			productName = Mantis;
 		};
 		D964FBC72EA5469A006A2573 /* GoogleSignIn */ = {
 			isa = XCSwiftPackageProductDependency;

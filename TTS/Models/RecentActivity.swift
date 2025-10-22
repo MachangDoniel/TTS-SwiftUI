@@ -15,7 +15,7 @@ struct RecentActivity: Identifiable, Codable, Equatable {
     let id: UUID
     var title: String
     var sourcePath: String?
-    var kind: ImportSource
+    var kind: InputSource
     var createdAt: Date
     var thumbnailData: Data?
     var bookmarkData: Data?
@@ -57,7 +57,7 @@ struct RecentActivity: Identifiable, Codable, Equatable {
     init(id: UUID = UUID(),
          title: String,
          sourcePath: String? = nil,
-         kind: ImportSource,
+         kind: InputSource,
          createdAt: Date = Date(),
          thumbnailData: Data? = nil,
          bookmarkData: Data? = nil) {

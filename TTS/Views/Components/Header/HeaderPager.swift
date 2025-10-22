@@ -14,6 +14,7 @@ struct HeaderPager: View {
         TabView {
             HeaderSlide(onTryForFree: onTryForFree)
             HeaderSlide(onTryForFree: onTryForFree)
+            HeaderSlide(onTryForFree: onTryForFree)
         }
         .tabViewStyle(.page)
         .indexViewStyle(.page(backgroundDisplayMode: .never))

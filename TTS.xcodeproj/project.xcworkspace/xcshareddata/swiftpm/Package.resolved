@@ -1,5 +1,5 @@
 {
-  "originHash" : "d55ff98e38134508f58b97355909656d435cac523614118c722a6c8cd9bd2f48",
+  "originHash" : "1cc72f11c9916c62bcfa7eee572ba6059d5bf70f5ace0a974c2743c7b58d3957",
   "pins" : [
     {
       "identity" : "alamofire",
@@ -62,6 +62,15 @@
       "state" : {
         "revision" : "56e0ccf09a6dd29dc7e68bdf729598240ca8aa16",
         "version" : "5.0.0"
+      }
+    },
+    {
+      "identity" : "mantis",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/guoyingtao/Mantis.git",
+      "state" : {
+        "revision" : "f15be5f37a54f1dbb11e739b62286c12ee644446",
+        "version" : "2.28.0"
       }
     },
     {

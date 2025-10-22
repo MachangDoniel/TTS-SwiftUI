@@ -96,13 +96,13 @@ final class RecentStore: ObservableObject {
     
     // MARK: - Public API (unchanged)
     
-    func add(title: String, kind: ImportSource) {
+    func add(title: String, kind: InputSource) {
         let display = sanitizeTitle(title)
         let activity = RecentActivity(title: display, kind: kind)
         dedupAndInsert(activity)
     }
     
-    func add(fileURL: URL, kind: ImportSource) {
+    func add(fileURL: URL, kind: InputSource) {
         let base = fileURL.deletingPathExtension().lastPathComponent
         let display = sanitizeTitle(base)
         var thumb: Data? = nil
@@ -118,7 +118,7 @@ final class RecentStore: ObservableObject {
         dedupAndInsert(activity)
     }
     
-    func addExternal(fileURL: URL, bookmarkData: Data, kind: ImportSource) {
+    func addExternal(fileURL: URL, bookmarkData: Data, kind: InputSource) {
         let base = fileURL.deletingPathExtension().lastPathComponent
         let display = sanitizeTitle(base)
         var thumb: Data? = nil
@@ -192,8 +192,8 @@ final class RecentStore: ObservableObject {
         fr.fetchLimit = 1
         do {
             guard let obj = try context.fetch(fr).first else { return }
-            let kindRaw = (obj.value(forKey: "kind") as? String) ?? ImportSource.files.rawValue
-            let kind = ImportSource(rawValue: kindRaw) ?? .files
+            let kindRaw = (obj.value(forKey: "kind") as? String) ?? InputSource.files.rawValue
+            let kind = InputSource(rawValue: kindRaw) ?? .files
             let oldTitle = (obj.value(forKey: "title") as? String) ?? display
             let oldSource = obj.value(forKey: "sourcePath") as? String
             
@@ -336,8 +336,8 @@ final class RecentStore: ObservableObject {
                 let id = (obj.value(forKey: "id") as? UUID) ?? UUID()
                 let title = (obj.value(forKey: "title") as? String) ?? "Untitled"
                 let sourcePath = obj.value(forKey: "sourcePath") as? String
-                let kindRaw = (obj.value(forKey: "kind") as? String) ?? ImportSource.files.rawValue
-                let kind = ImportSource(rawValue: kindRaw) ?? .files
+                let kindRaw = (obj.value(forKey: "kind") as? String) ?? InputSource.files.rawValue
+                let kind = InputSource(rawValue: kindRaw) ?? .files
                 let createdAt = (obj.value(forKey: "createdAt") as? Date) ?? Date()
                 let thumb = obj.value(forKey: "thumbnailData") as? Data
                 let bookmarkData = obj.value(forKey: "bookmarkData") as? Data

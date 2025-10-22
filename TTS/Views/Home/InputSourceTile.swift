@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct ImportTile: View {
+struct InputSourceTile: View {
     var icon: String
     var title: String
     var tint: Color = .white
@@ -49,28 +49,28 @@ struct ImportTile: View {
         Color.black.ignoresSafeArea();
         VStack {
             HStack {
-                ImportTile(icon: "folder.fill", title: "Files")
-                ImportTile(icon: "folder.fill", title: "Files")
-                ImportTile(icon: "folder.fill", title: "Files")
-                ImportTile(icon: "folder.fill", title: "Files")
+                InputSourceTile(icon: "folder.fill", title: "Files")
+                InputSourceTile(icon: "folder.fill", title: "Files")
+                InputSourceTile(icon: "folder.fill", title: "Files")
+                InputSourceTile(icon: "folder.fill", title: "Files")
             }
             HStack {
-                ImportTile(icon: "folder.fill", title: "Files")
-                ImportTile(icon: "folder.fill", title: "Files")
-                ImportTile(icon: "folder.fill", title: "Files")
-                ImportTile(icon: "folder.fill", title: "Files")
+                InputSourceTile(icon: "folder.fill", title: "Files")
+                InputSourceTile(icon: "folder.fill", title: "Files")
+                InputSourceTile(icon: "folder.fill", title: "Files")
+                InputSourceTile(icon: "folder.fill", title: "Files")
             }
             HStack {
-                ImportTile(icon: "folder.fill", title: "Files")
-                ImportTile(icon: "folder.fill", title: "Files")
-                ImportTile(icon: "folder.fill", title: "Files")
-                ImportTile(icon: "folder.fill", title: "Files")
+                InputSourceTile(icon: "folder.fill", title: "Files")
+                InputSourceTile(icon: "folder.fill", title: "Files")
+                InputSourceTile(icon: "folder.fill", title: "Files")
+                InputSourceTile(icon: "folder.fill", title: "Files")
             }
             HStack {
-                ImportTile(icon: "folder.fill", title: "Files")
-                ImportTile(icon: "folder.fill", title: "Files")
-                ImportTile(icon: "folder.fill", title: "Files")
-                ImportTile(icon: "folder.fill", title: "Files")
+                InputSourceTile(icon: "folder.fill", title: "Files")
+                InputSourceTile(icon: "folder.fill", title: "Files")
+                InputSourceTile(icon: "folder.fill", title: "Files")
+                InputSourceTile(icon: "folder.fill", title: "Files")
             }
             
         }
