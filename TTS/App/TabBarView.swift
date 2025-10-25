@@ -7,6 +7,11 @@
 
 import SwiftUI
 
+struct IdentifiableURL: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
 struct TabBarView: View {
     @State private var selectedTab: Int = 0
     
@@ -16,6 +21,13 @@ struct TabBarView: View {
     @State private var showPhotoReader = false
     
     @State private var selectedDocumentURL: URL?
+    
+    @State private var webLinkItem: IdentifiableURL? = nil
+    @State private var extractedTextFromWeb: String? = nil
+    @State private var showLinkInput = false
+    @State private var linkInputText = ""
+    @State private var prefilledLinkText: String? = nil
+    
     @StateObject private var recentStore = RecentStore()
     @StateObject private var tts = TTSPlayer()
 
@@ -30,8 +42,16 @@ struct TabBarView: View {
                     onScan: { showCameraReader = true },
                     onPickDropbox: { /* TODO */ },
                     onPickBook: { /* TODO */ },
-                    onTypeText: { showTextInput = true },
-                    onPasteLink: { /* TODO */ },
+                    onTypeText: {
+                        // Ensure a clean sheet when typing manually
+                        prefilledLinkText = nil
+                        showTextInput = true
+                    },
+                    onPasteLink: {
+                        // Open a simple sheet or alert to enter link manually
+                        linkInputText = ""
+                        showLinkInput = true
+                    },
                     onTryForFree: { /* TODO */ },
                     onOpenRecent: { item in
                         if let sp = item.sourcePath, !sp.isEmpty,
@@ -118,13 +138,16 @@ struct TabBarView: View {
                 }
             }
             .sheet(isPresented: $showTextInput) {
-                TextInputView(tts: tts) { url in
-                    // Add to recent and open file
+                TextInputView(
+                    tts: tts,
+                    prefilledText: prefilledLinkText ?? ""
+                ) { url in
                     do {
                         let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
                         recentStore.addExternal(fileURL: url, bookmarkData: bookmark, kind: .files)
+                        Logger.log("[TabBarView] Added text file to recents with bookmark")
                     } catch {
-                        Logger.log("Bookmark error: \(error.localizedDescription)")
+                        Logger.log("[TabBarView] Bookmark error (text): \(error.localizedDescription)")
                         // Fallback: still add without bookmark if it failed
                         recentStore.addExternal(fileURL: url, bookmarkData: Data(), kind: .files)
                     }
@@ -155,6 +178,25 @@ struct TabBarView: View {
                         Logger.log("Bookmark error (photos): \(error.localizedDescription)")
                         // Fallback: still add without bookmark if it failed
                         recentStore.addExternal(fileURL: url, bookmarkData: Data(), kind: .photos)
+                    }
+                }
+            }
+            .sheet(item: $webLinkItem) { item in
+                WebReaderView(url: item.url) { extractedText in
+                    DispatchQueue.main.async {
+                        Logger.log("[TabBarView] Web extraction finished, opening TextInputView. Extracted length: \(extractedText.count)")
+                        prefilledLinkText = extractedText
+                        showTextInput = true
+                    }
+                }
+                .environmentObject(tts)
+            }
+            .sheet(isPresented: $showLinkInput) {
+                LinkInputView(isPresented: $showLinkInput, linkText: $linkInputText) { url in
+                    Logger.log("[TabBarView] Received link input: \(url.absoluteString)")
+                    DispatchQueue.main.async {
+                        Logger.log("[TabBarView] Showing WebReaderView sheet")
+                        webLinkItem = IdentifiableURL(url: url)
                     }
                 }
             }
@@ -245,3 +287,4 @@ struct TabBarView: View {
 #Preview {
     TabBarView()
 }
+

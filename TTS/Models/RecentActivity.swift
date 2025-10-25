@@ -95,4 +95,37 @@ struct RecentActivity: Identifiable, Codable, Equatable {
         guard let url = resolvedURL, url.isFileURL else { return false }
         return FileManager.default.fileExists(atPath: url.path)
     }
+
+    // MARK: - Text Persistence Helpers
+    /// Saves the provided text as a UTF-8 .txt file in the app's Documents directory and returns a configured RecentActivity.
+    /// The file name is derived from the title with a .txt extension, and a UUID is appended to avoid collisions.
+    static func makeTextActivity(title: String, text: String) throws -> RecentActivity {
+        let sanitizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let base = sanitizedTitle.isEmpty ? "Text" : sanitizedTitle
+        let uniqueName = "\(base) - \(UUID().uuidString.prefix(8)).txt"
+        Logger.log("[RecentActivity] Creating .txt file: \(uniqueName)")
+
+        let fm = FileManager.default
+        let docsURL = try fm.url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+        let fileURL = docsURL.appendingPathComponent(uniqueName)
+        Logger.log("[RecentActivity] Target path: \(fileURL.path)")
+
+        let data = text.data(using: .utf8) ?? Data()
+        Logger.log("[RecentActivity] Byte count: \(data.count)")
+
+        do {
+            try data.write(to: fileURL, options: .atomic)
+            Logger.log("[RecentActivity] Wrote file successfully")
+        } catch {
+            Logger.log("[RecentActivity][Error] Failed to write file: \(error.localizedDescription)")
+            throw error
+        }
+
+        return RecentActivity(title: uniqueName,
+                              sourcePath: fileURL.path,
+                              kind: .text,
+                              createdAt: Date(),
+                              thumbnailData: nil,
+                              bookmarkData: nil)
+    }
 }

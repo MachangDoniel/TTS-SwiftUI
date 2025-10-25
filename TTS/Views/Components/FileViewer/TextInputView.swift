@@ -5,11 +5,13 @@
 //  Created by Doniel Tripura on 10/20/25.
 //
 
+
 import SwiftUI
 
 struct TextInputView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var tts: TTSPlayer
+    var prefilledText: String? = nil
     var onSaved: ((URL) -> Void)? = nil
 
     @State private var inputText = ""
@@ -61,11 +63,20 @@ struct TextInputView: View {
         .background(Color.black.ignoresSafeArea())
         .preferredColorScheme(.dark)
         .navigationBarHidden(true)
+        .onAppear {
+            // 👇 if text came from web extraction, set and start reading immediately
+            if let prefilled = prefilledText, inputText.isEmpty {
+                inputText = prefilled
+                tts.stop()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    tts.startReading(prefilled)
+                }
+            }
+        }
     }
 
     // MARK: - Cancel Handler
     private func cancelAndDismiss() {
-        // stop any speech immediately
         tts.stop()
         dismiss()
     }
@@ -89,11 +100,9 @@ struct TextInputView: View {
             let fileURL = dir.appendingPathComponent(name)
             try trimmed.write(to: fileURL, atomically: true, encoding: .utf8)
 
-            // Mark this TTS session
             tts.currentTitle = name
             tts.currentURL = fileURL
 
-            // Inform parent (TabBarView)
             onSaved?(fileURL)
             dismiss()
 
@@ -150,6 +159,6 @@ private extension NSRange {
 }
 
 #Preview {
-    TextInputView(tts: TTSPlayer())
+    TextInputView(tts: TTSPlayer(), prefilledText: "Example prefilled text from a link...")
         .preferredColorScheme(.dark)
 }

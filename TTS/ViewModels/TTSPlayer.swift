@@ -85,7 +85,7 @@ class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, AVAudi
     @Published var currentWordRange: NSRange? = nil
 
     /// Switchable voice pipeline
-    @Published var appVoice: AppVoiceMode = .backend
+    @Published var appVoice: AppVoiceMode = .default
 
     /// Backend voice sample selection (defaults to "1")
     @Published var selectedVoiceSampleId: String = "1"
