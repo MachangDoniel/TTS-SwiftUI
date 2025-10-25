@@ -1,5 +1,5 @@
 //
-//  TTSControlsView.swift
+//  TTSControlView.swift
 //  TTS
 //
 //  Created by Doniel Tripura on 10/5/25.
@@ -11,19 +11,17 @@ struct TTSControlView: View {
     @ObservedObject var tts: TTSPlayer
     @State private var showLanguagePicker = false
     let text: String
-    
-    @State private var playbackProgress: Double = 0.0
-    
+
     var body: some View {
         VStack(spacing: 16) {
-            
-            // Progress bar
+
+            // Progress bar across sentences
             ProgressView(value: tts.progress)
                 .progressViewStyle(.linear)
                 .tint(.blue)
                 .padding(.horizontal)
-            
-            // Time + sentence counter
+
+            // Sentence counter
             HStack {
                 Text("00:00")
                 Spacer()
@@ -34,10 +32,11 @@ struct TTSControlView: View {
             .font(.caption)
             .foregroundColor(.gray)
             .padding(.horizontal)
-            
+
             // Main controls
             HStack(spacing: 32) {
-                // Language / Flag Button (placeholder)
+
+                // Language / Backend voice picker
                 Button(action: {
                     showLanguagePicker.toggle()
                 }) {
@@ -47,8 +46,8 @@ struct TTSControlView: View {
                         .clipShape(Circle())
                         .overlay(Circle().stroke(Color.white, lineWidth: 2))
                 }
-                
-                // Back 10s
+
+                // Back (previous sentence)
                 Button(action: {
                     tts.previousSentence()
                 }) {
@@ -59,7 +58,7 @@ struct TTSControlView: View {
                             .font(.caption2)
                     }
                 }
-                
+
                 // Play / Pause
                 Button(action: {
                     if !tts.isSpeaking {
@@ -77,8 +76,8 @@ struct TTSControlView: View {
                             .foregroundColor(.white)
                     }
                 }
-                
-                // Forward 10s
+
+                // Forward (next sentence)
                 Button(action: {
                     tts.nextSentence()
                 }) {
@@ -89,8 +88,8 @@ struct TTSControlView: View {
                             .font(.caption2)
                     }
                 }
-                
-                // Share button
+
+                // Share (placeholder)
                 Button(action: {
                     // TODO: share current text
                 }) {
@@ -100,7 +99,7 @@ struct TTSControlView: View {
             }
             .padding(.horizontal)
             .foregroundColor(.white)
-            
+
         }
         .padding(.vertical)
         .background(Color(.systemGray6).opacity(0.15))
@@ -110,6 +109,7 @@ struct TTSControlView: View {
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showLanguagePicker) {
             LanguagePickerView()
+                .environmentObject(tts)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }

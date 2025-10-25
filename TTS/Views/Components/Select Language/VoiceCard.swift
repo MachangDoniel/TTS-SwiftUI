@@ -50,7 +50,8 @@ struct VoiceCard_Previews: PreviewProvider {
                         language: "English",
                         accent: "British",
                         mood: "Calm",
-                        type: "Premium"
+                        type: "Premium",
+                        voiceSampleId: "1"
                     )
                 )
                 
@@ -60,7 +61,8 @@ struct VoiceCard_Previews: PreviewProvider {
                         language: "English",
                         accent: "American",
                         mood: "Energetic",
-                        type: "Standard"
+                        type: "Standard",
+                        voiceSampleId: "1"
                     )
                 )
             }

@@ -8,8 +8,14 @@
 import SwiftUI
 
 struct ContentView: View {
+    
+    @StateObject private var tts = TTSPlayer()
+    @StateObject private var recentStore = RecentStore()
     var body: some View {
         TabBarView()
+            .environmentObject(tts)
+            .environmentObject(recentStore)
+//        TTSDemoView()
     }
 }
 

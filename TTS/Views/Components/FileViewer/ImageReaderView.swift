@@ -217,7 +217,7 @@ struct ImageReaderView: View {
                 onSaved?(fileURL)
             }
         } catch {
-            print("❌ Save failed:", error.localizedDescription)
+            Logger.log("❌ Save failed: \(error.localizedDescription)")
         }
     }
 }

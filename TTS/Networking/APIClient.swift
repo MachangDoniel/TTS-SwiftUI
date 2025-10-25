@@ -24,8 +24,8 @@ final class APIClient {
         // MARK: Log Request
         let requestData = try JSONEncoder().encode(body)
         if let jsonString = String(data: requestData, encoding: .utf8) {
-            print("➡️ REQUEST → \(method.rawValue) \(url)")
-            print("📦 Body:")
+            Logger.debugPrint("➡️ REQUEST → \(method.rawValue) \(url)")
+            Logger.debugPrint("📦 Body:")
             print(jsonString)
         }
         
@@ -42,10 +42,10 @@ final class APIClient {
         
         // MARK: Log Raw Response
         let statusCode = afResponse.response?.statusCode ?? -1
-        print("⬅️ RESPONSE ← \(url) [\(statusCode)]")
+        Logger.debugPrint("⬅️ RESPONSE ← \(url) [\(statusCode)]")
         if let data = afResponse.data,
            let str = String(data: data, encoding: .utf8) {
-            print("📨 Response Body:\n\(str)")
+            Logger.debugPrint("📨 Response Body:\n\(str)")
         }
         
         // MARK: Validate Status Code
@@ -62,7 +62,7 @@ final class APIClient {
             let decoded = try JSONDecoder().decode(R.self, from: data)
             return decoded
         } catch {
-            print("❌ JSON Decoding failed:", error.localizedDescription)
+            Logger.debugPrint("❌ JSON Decoding failed: \(error.localizedDescription)")
             throw error
         }
     }

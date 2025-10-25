@@ -98,7 +98,7 @@ struct TextInputView: View {
             dismiss()
 
         } catch {
-            print("❌ Save failed:", error.localizedDescription)
+            Logger.log("❌ Save failed: \(error.localizedDescription)")
         }
     }
 }

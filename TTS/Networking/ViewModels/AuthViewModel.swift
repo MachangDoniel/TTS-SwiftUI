@@ -28,10 +28,10 @@ final class AuthViewModel: ObservableObject {
                 body: body
             )
             tokenData = response.data
-            print("✅ Login successful:", response.data.accessToken)
+            Logger.log("✅ Login successful: \(response.data.accessToken)")
         } catch {
             errorMessage = error.localizedDescription
-            print("❌ Login failed:", error.localizedDescription)
+            Logger.log("❌ Login failed: \(error.localizedDescription)")
         }
     }
 }

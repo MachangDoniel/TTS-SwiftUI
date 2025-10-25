@@ -173,9 +173,9 @@ struct PDFKitView: UIViewRepresentable {
 
             // Fallback token-span matching (already returns original-text range)
             if let fallbackRange = fallbackTokenSpanRange(sentence: sentence, text: pageText) {
-                #if DEBUG
-                print("[PDF] Fallback token span used for sentence index \(index)")
-                #endif
+                
+                Logger.log("[PDF] Fallback token span used for sentence index \(index)")
+                
                 // Try to refine the fallback span using normalized search limited to the span
                 let refined = normalizedRangeInOriginal(haystack: pageText, needle: sentence, searchRange: fallbackRange) ?? fallbackRange
                 let tight = shrinkRangeToSentence(in: pageText, candidate: refined, sentence: sentence)

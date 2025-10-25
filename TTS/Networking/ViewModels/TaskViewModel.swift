@@ -41,10 +41,10 @@ final class TaskViewModel: ObservableObject {
                 body: body
             )
             taskId = response.data.taskId
-            print("✅ Task created: \(response.data.taskId)")
+            Logger.log("✅ Task created: \(response.data.taskId)")
         } catch {
             errorMessage = error.localizedDescription
-            print("❌ Failed to create task:", error.localizedDescription)
+            Logger.log("❌ Failed to create task: \(error.localizedDescription)")
         }
     }
 }

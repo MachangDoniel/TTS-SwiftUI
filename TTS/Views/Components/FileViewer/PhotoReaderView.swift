@@ -175,7 +175,7 @@ struct PhotoReaderView: View {
                 dismiss()
             }
         } catch {
-            print("❌ Save failed:", error.localizedDescription)
+            Logger.log("❌ Save failed: \(error.localizedDescription)")
         }
     }
 }

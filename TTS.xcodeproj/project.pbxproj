@@ -73,6 +73,7 @@
 				Networking/Models/TaskModels.swift,
 				Networking/ViewModels/AuthViewModel.swift,
 				Utilities/DocumentPicker.swift,
+				Utilities/Logger.swift,
 				Utilities/ShareSheet.swift,
 				Utilities/URLHelpers.swift,
 				ViewModels/RecentStore.swift,

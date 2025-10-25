@@ -71,7 +71,7 @@ struct LibraryView: View {
                                                         opened = true
                                                     } else {
                                                         // TODO: handle links/text or show message
-                                                        print("Unable to resolve local file for: \(item.title)")
+                                                        Logger.log("Unable to resolve local file for: \(item.title)")
                                                     }
                                                 }
                                             } label: {

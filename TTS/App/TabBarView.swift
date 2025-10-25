@@ -45,13 +45,13 @@ struct TabBarView: View {
                                     let resolved = try URL(resolvingBookmarkData: bm, options: [], relativeTo: nil, bookmarkDataIsStale: &isStale)
                                     if resolved.startAccessingSecurityScopedResource() {
                                         // Stop any ongoing TTS to ensure clean refresh
-                                        tts.stop()
+//                                        tts.stop()
                                         selectedDocumentURL = resolved
                                         opened = true
                                         // Note: do not stopAccessing here; keep access while viewing
                                     }
                                 } catch {
-                                    print("Failed to resolve bookmark: \(error)")
+                                    Logger.log("Failed to resolve bookmark: \(error)")
                                 }
                             }
                             if !opened {
@@ -61,7 +61,7 @@ struct TabBarView: View {
                                     selectedDocumentURL = url
                                     opened = true
                                 } else {
-                                    print("Recent file missing at path: \(sp)")
+                                    Logger.log("Recent file missing at path: \(sp)")
                                 }
                             }
                         } else if item.kind == .link,
@@ -104,7 +104,7 @@ struct TabBarView: View {
                             recentStore.addExternal(fileURL: url, bookmarkData: bookmark, kind: .files)
                             resolvedURL = url
                         } catch {
-                            print("Failed to create bookmark: \(error)")
+                            Logger.log("Failed to create bookmark: \(error)")
                             // Even if bookmark fails, still try to open immediately with active access
                             resolvedURL = url
                         }
@@ -124,7 +124,7 @@ struct TabBarView: View {
                         let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
                         recentStore.addExternal(fileURL: url, bookmarkData: bookmark, kind: .files)
                     } catch {
-                        print("Bookmark error:", error.localizedDescription)
+                        Logger.log("Bookmark error: \(error.localizedDescription)")
                         // Fallback: still add without bookmark if it failed
                         recentStore.addExternal(fileURL: url, bookmarkData: Data(), kind: .files)
                     }
@@ -140,7 +140,7 @@ struct TabBarView: View {
                         let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
                         recentStore.addExternal(fileURL: url, bookmarkData: bookmark, kind: .scan)
                     } catch {
-                        print("Bookmark error (scan):", error.localizedDescription)
+                        Logger.log("Bookmark error (scan): \(error.localizedDescription)")
                         // Fallback: still add without bookmark if it failed
                         recentStore.addExternal(fileURL: url, bookmarkData: Data(), kind: .scan)
                     }
@@ -152,7 +152,7 @@ struct TabBarView: View {
                         let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
                         recentStore.addExternal(fileURL: url, bookmarkData: bookmark, kind: .photos)
                     } catch {
-                        print("Bookmark error (photos):", error.localizedDescription)
+                        Logger.log("Bookmark error (photos): \(error.localizedDescription)")
                         // Fallback: still add without bookmark if it failed
                         recentStore.addExternal(fileURL: url, bookmarkData: Data(), kind: .photos)
                     }
@@ -183,7 +183,7 @@ struct TabBarView: View {
                             selectedTab = 0
                             selectedDocumentURL = url
                         } else {
-                            debugPrint("Nothing to play or open")
+                            Logger.log("Nothing to play or open")
                             // Optional: show a message to the user
                             // e.g., present an alert or haptic to indicate there's nothing to open
                         }
@@ -209,7 +209,7 @@ struct TabBarView: View {
                 try FileManager.default.copyItem(at: url, to: destinationURL)
                 localURL = destinationURL
             } catch {
-                print("Error copying file locally: \(error)")
+                Logger.log("Error copying file locally: \(error)")
             }
         }
         return localURL

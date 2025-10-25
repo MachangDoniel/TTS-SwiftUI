@@ -41,13 +41,13 @@ final class SpeechViewModel: ObservableObject {
             speechData = response.data
             
             if let url = response.data?.downloadUrl {
-                print("✅ Download URL:", url)
+                Logger.log("✅ Download URL: \(url)")
             } else {
-                print("ℹ️ Speech generation in progress, URL not ready yet.")
+                Logger.log("ℹ️ Speech generation in progress, URL not ready yet.")
             }
         } catch {
             errorMessage = error.localizedDescription
-            print("❌ Failed to generate speech:", error.localizedDescription)
+            Logger.log("❌ Failed to generate speech: \(error.localizedDescription)")
         }
     }
     
@@ -79,14 +79,14 @@ final class SpeechViewModel: ObservableObject {
                 let status = data.status ?? "Unknown"
                 let progressText = data.progress != nil ? "\(data.progress!)%" : "N/A"
                 
-                print("✅ Job Status: \(status), Progress: \(progressText)")
+                Logger.log("✅ Job Status: \(status), Progress: \(progressText)")
             } else {
-                print("⚠️ No job data returned")
+                Logger.log("⚠️ No job data returned")
             }
             
         } catch {
             errorMessage = error.localizedDescription
-            print("❌ Failed to fetch job status:", error.localizedDescription)
+            Logger.log("❌ Failed to fetch job status: \(error.localizedDescription)")
         }
     }
 }

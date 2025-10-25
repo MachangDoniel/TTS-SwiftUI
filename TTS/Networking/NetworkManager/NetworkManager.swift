@@ -25,7 +25,7 @@ final class NetworkManager {
             request.httpBody = jsonData
             
             // Print full request
-            print("➡️ REQUEST to \(url):")
+            Logger.log("➡️ REQUEST to \(url):")
             if let requestBody = String(data: jsonData, encoding: .utf8) {
                 print(requestBody)
             }
@@ -35,17 +35,17 @@ final class NetworkManager {
             
             // Print raw HTTP status
             if let httpResponse = response as? HTTPURLResponse {
-                print("⬅️ RESPONSE from \(url): Status \(httpResponse.statusCode)")
+                Logger.log("⬅️ RESPONSE from \(url): Status \(httpResponse.statusCode)")
             }
             
             // Print backend's full response message (exactly what it sent)
             if let responseString = String(data: data, encoding: .utf8) {
-                print("📩 Backend Response:")
+                Logger.log("📩 Backend Response:")
                 print(responseString)
             }
 
         } catch {
-            print("❌ Network error:", error.localizedDescription)
+            Logger.log("❌ Network error: \(error.localizedDescription)")
         }
     }
 
