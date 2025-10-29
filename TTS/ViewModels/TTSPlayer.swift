@@ -301,7 +301,17 @@ class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, AVAudi
         currentSentenceText = sentence
 
         let utterance = AVSpeechUtterance(string: sentence)
-        utterance.voice = AVSpeechSynthesisVoice(language: config.language)
+
+        // For Free/system voices, choose exact AVSpeechSynthesisVoice by identifier.
+        // For Premium/backend voices, this is handled in backend flow.
+        let selectedId = selectedVoiceSampleId
+        if let sysVoice = AVSpeechSynthesisVoice(identifier: selectedId) {
+            utterance.voice = sysVoice
+        } else {
+            // fallback to language
+            utterance.voice = AVSpeechSynthesisVoice(language: config.language)
+        }
+
         utterance.rate = config.rate
         synthesizer.speak(utterance)
 

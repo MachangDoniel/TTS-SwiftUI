@@ -14,7 +14,7 @@ struct Voice: Identifiable, Codable {
     let accent: String
     let mood: String
     let type: String
-    let voiceSampleId: String  // 👈 required by backend
+    let voiceSampleId: String
 }
 
 enum VoiceType: String {

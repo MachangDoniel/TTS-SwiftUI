@@ -28,3 +28,7 @@ struct AuthResponse: Codable {
     let message: String
     let data: TokenData
 }
+
+struct RefreshTokenRequest: Codable {
+    let refreshToken: String
+}

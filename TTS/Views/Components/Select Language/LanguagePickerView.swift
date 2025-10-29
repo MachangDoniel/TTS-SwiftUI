@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import AVFoundation
+import Combine
 
 // MARK: - View
 
@@ -15,31 +17,18 @@ struct LanguagePickerView: View {
     @State private var showLanguageOptions = false
     @State private var selectedFilter: VoiceType? = nil // nil = all
     @State private var selectedLanguage: String? = nil // nil = all
+    @State private var isLoading: Bool = false
+    @State private var errorMessage: String? = nil
     @FocusState private var isSearchFieldFocused: Bool
 
     /// shared TTS player (via environment)
     @EnvironmentObject var tts: TTSPlayer
-
-    // MARK: - Voice catalog
-    let voices: [Voice] = [
-        Voice(name: "Siri",      language: "English", accent: "US", mood: "Calm",       type: "Free",    voiceSampleId: "0"),
-        Voice(name: "Anastasia", language: "English", accent: "US", mood: "Calm",       type: "Premium", voiceSampleId: "1"),
-        Voice(name: "Carlos",    language: "Español", accent: "ES", mood: "Lively",     type: "Premium", voiceSampleId: "2"),
-        Voice(name: "Emma",      language: "English", accent: "UK", mood: "Friendly",   type: "Premium", voiceSampleId: "3"),
-        Voice(name: "Nikolai",   language: "Russian", accent: "RU", mood: "Calm",       type: "Premium", voiceSampleId: "4"),
-        Voice(name: "Sophia",    language: "German",  accent: "DE", mood: "Bright",     type: "Premium", voiceSampleId: "5"),
-        Voice(name: "Mia",       language: "Danish",  accent: "DK", mood: "Energetic",  type: "Premium", voiceSampleId: "6"),
-        Voice(name: "Giovanni",  language: "Italian", accent: "IT", mood: "Smooth",     type: "Premium", voiceSampleId: "7"),
-        Voice(name: "Lena",      language: "Greek",   accent: "GR", mood: "Warm",       type: "Premium", voiceSampleId: "8"),
-        Voice(name: "Aarav",     language: "Hindi",   accent: "IN", mood: "Deep",       type: "Premium", voiceSampleId: "9"),
-        Voice(name: "Maria",     language: "Español", accent: "MX", mood: "Soft",       type: "Premium", voiceSampleId: "10"),
-    ]
-
-    let languages = ["English", "Español", "Danish", "German", "Greek", "Italian", "Russian", "Hindi"]
+    
+    @EnvironmentObject var voiceCatalog: VoiceCatalog
 
     // MARK: - Filtering
     var filteredVoices: [Voice] {
-        voices.filter { voice in
+        voiceCatalog.voices.filter { voice in
             let matchesSearch = searchText.isEmpty ||
                 voice.name.localizedCaseInsensitiveContains(searchText) ||
                 voice.language.localizedCaseInsensitiveContains(searchText)
@@ -55,6 +44,21 @@ struct LanguagePickerView: View {
             ZStack {
                 Color.black.ignoresSafeArea()
 
+                if let error = errorMessage {
+                    VStack {
+                        Text(error)
+                            .font(.subheadline)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color.red.opacity(0.9))
+                            .clipShape(Capsule())
+                            .padding(.top, 8)
+                        Spacer()
+                    }
+                    .transition(.opacity)
+                }
+
                 VStack(spacing: 0) {
                     // MARK: - Top Bar
                     HStack(spacing: 12) {
@@ -67,6 +71,16 @@ struct LanguagePickerView: View {
                     .padding(.horizontal)
                     .padding(.vertical, 8)
                     .background(Color.black.opacity(0.95))
+//                    .overlay(
+//                        ZStack {
+//                            if isLoading {
+//                                // Loading ring around the control area
+//                                ProgressView()
+//                                    .progressViewStyle(.circular)
+//                                    .tint(.white)
+//                            }
+//                        }
+//                    )
 
                     // MARK: - Language Filter
                     if showLanguageOptions && !isSearching {
@@ -198,7 +212,7 @@ struct LanguagePickerView: View {
     private var languageFilter: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                ForEach(languages, id: \.self) { lang in
+                ForEach(voiceCatalog.languages, id: \.self) { lang in
                     Button(action: {
                         withAnimation {
                             selectedLanguage = (selectedLanguage == lang) ? nil : lang
@@ -223,22 +237,104 @@ struct LanguagePickerView: View {
 
     private func selectVoice(_ voice: Voice) {
         // update voice id and mode
-        tts.selectedVoiceSampleId = voice.voiceSampleId
-        tts.appVoice = (voice.type == VoiceType.Free.rawValue) ? .default : .backend
+        errorMessage = nil
+        isLoading = true
 
-        Logger.debugPrint("🎙 Selected \(voice.name) (\(voice.type)) → appVoice = \(tts.appVoice)")
+        // Snapshot BEFORE stopping or changing routing
+        let snapshotSentences = tts.sentences
+        let snapshotCurrent = tts.currentSentenceText
+
+        // Helper to normalize matching
+        func normalize(_ s: String) -> String {
+            s.trimmingCharacters(in: .whitespacesAndNewlines)
+             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        }
+
+        tts.selectedVoiceSampleId = voice.voiceSampleId
+        if voice.type == VoiceType.Free.rawValue {
+            tts.appVoice = .default
+        } else {
+            // Any non-Free (e.g., Premium) should use backend flow
+            tts.appVoice = .backend
+        }
+
+        Logger.debugPrint("🎙 Selected voice=\(voice.name) type=\(voice.type) → routing=\(tts.appVoice == .backend ? "backend" : "local")")
 
         Task { @MainActor in
-            // 1️⃣ stop current speech (both Apple or backend)
-            tts.stop()
+            do {
+                // Use snapshots captured BEFORE stopping
+                let sentences = snapshotSentences
+                let currentSentence = snapshotCurrent
 
-            // 2️⃣ restart reading from the same text if available
-            if !tts.sentences.isEmpty {
-                let activeText = tts.sentences.joined(separator: " ")
-                tts.startReading(activeText)
-            } else if !tts.currentSentenceText.isEmpty {
-                // fallback if sentences aren’t cached yet
-                tts.startReading(tts.currentSentenceText)
+                // Robust index match using normalization
+                let normCurrent = normalize(currentSentence)
+                let currentIndex: Int? = sentences.firstIndex { normalize($0) == normCurrent }
+
+                // Determine routing change (free <-> premium)
+                let isPremiumSelected = (voice.type != VoiceType.Free.rawValue)
+                let previousWasBackend = (tts.appVoice == .backend) // appVoice currently reflects target routing; if you track previous routing, inject it here
+                let routingChanged = previousWasBackend != isPremiumSelected
+
+                // Choose resume index: next sentence if routing changed and no active current, else keep current
+                let resumeIndex: Int? = {
+                    if let idx = currentIndex, !sentences.isEmpty {
+                        if routingChanged {
+                            return normCurrent.isEmpty ? min(idx + 1, sentences.count - 1) : idx
+                        } else {
+                            return idx
+                        }
+                    }
+                    return nil
+                }()
+
+                // Build text to read from resume index onward
+                let textToRead: String = {
+                    if let idx = resumeIndex, !sentences.isEmpty {
+                        return sentences[idx...].joined(separator: " ")
+                    }
+                    if !currentSentence.isEmpty { return currentSentence }
+                    return sentences.joined(separator: " ")
+                }()
+
+                // Remaining chunks estimate for backend task creation
+                let remainingChunks: Int = {
+                    if let idx = resumeIndex { return max(sentences.count - idx, 0) }
+                    return max(sentences.count - (currentIndex ?? 0), 0)
+                }()
+                Logger.debugPrint("📦 Backend remaining chunks estimate: \(remainingChunks)")
+
+                // Stop current speech now (after snapshot)
+                tts.stop()
+
+                // Align highlighting to the sentence we will start from
+                if let idx = resumeIndex, !sentences.isEmpty {
+                    tts.currentSentenceText = sentences[idx]
+                } else if !currentSentence.isEmpty {
+                    tts.currentSentenceText = currentSentence
+                }
+
+                // Restart reading
+                if !textToRead.isEmpty {
+                    try await tts.startReading(textToRead)
+                } else {
+                    Logger.debugPrint("ℹ️ No text to read.")
+                }
+
+                // Success → stop loading
+                isLoading = false
+            } catch {
+                // Failure → show error and pause control
+                isLoading = false
+                errorMessage = (error as NSError).localizedDescription
+                Logger.debugPrint("🗣 ❌ Failed to start reading: \(error.localizedDescription)")
+
+                // Auto-dismiss the error banner after a short delay
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    if errorMessage == (error as NSError).localizedDescription {
+                        withAnimation { errorMessage = nil }
+                    }
+                }
             }
         }
     }
@@ -249,4 +345,5 @@ struct LanguagePickerView: View {
 #Preview {
     LanguagePickerView()
         .environmentObject(TTSPlayer())
+        .environmentObject(VoiceCatalog.shared)
 }

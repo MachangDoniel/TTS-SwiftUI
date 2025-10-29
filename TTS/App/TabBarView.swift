@@ -21,7 +21,6 @@ struct TabBarView: View {
     @State private var showPhotoReader = false
     
     @State private var selectedDocumentURL: URL?
-    
     @State private var webLinkItem: IdentifiableURL? = nil
     @State private var extractedTextFromWeb: String? = nil
     @State private var showLinkInput = false
