@@ -16,11 +16,11 @@ final class AuthViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var isLoading = false
     
-    func loginWithGoogle(provider: String = "google", idToken: String, platform: String = "iOS") async {
+    func loginWithGoogle(provider: ProviderEnum = .google, idToken: String, platform: PlatformEnum = .iOS) async {
         isLoading = true
         defer { isLoading = false }
         
-        let body = GoogleAuthRequest(provider: provider, idToken: idToken, platform: platform)
+        let body = GoogleAuthRequest(provider: provider.rawValue, idToken: idToken, platform: platform.rawValue)
         
         do {
             let response: AuthResponse = try await APIClient.shared.request(

@@ -42,7 +42,6 @@
 
 /* Begin PBXFileReference section */
 		D94AF8BE2E9146650017C37C /* TTS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TTS.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		D9640AFA2EAD5452006A2573 /* TTS-Prod-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "TTS-Prod-Info.plist"; sourceTree = "<group>"; };
 		D964FBDB2EA5565F006A2573 /* TTS Prod.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "TTS Prod.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -52,6 +51,7 @@
 			membershipExceptions = (
 				Extension/Color.swift,
 				Info.plist,
+				"TTS-Prod-Info.plist",
 				Utilities/URLHelpers.swift,
 			);
 			target = D94AF8BD2E9146650017C37C /* TTS */;
@@ -59,52 +59,9 @@
 		D964FBDC2EA5565F006A2573 /* Exceptions for "TTS" folder in "TTS Prod" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				App/AppDelegate.swift,
-				App/ContentView.swift,
-				App/TabBarView.swift,
-				App/TTSApp.swift,
 				Extension/Color.swift,
 				Info.plist,
-				Models/FileFilter.swift,
-				Models/InputSource.swift,
-				Models/RecentActivity.swift,
-				Models/Voice.swift,
-				Networking/APIClient.swift,
-				Networking/APIEndpoints.swift,
-				Networking/Models/AuthModels.swift,
-				Networking/Models/SpeechModels.swift,
-				Networking/Models/TaskModels.swift,
-				Networking/ViewModels/AuthViewModel.swift,
-				Utilities/DocumentPicker.swift,
-				Utilities/Logger.swift,
-				Utilities/ShareSheet.swift,
-				Utilities/URLHelpers.swift,
-				Utilities/WebReaderView.swift,
-				ViewModels/RecentStore.swift,
-				ViewModels/TTSPlayer.swift,
-				Views/Components/BottomSheet/BottomSheet.swift,
-				Views/Components/BottomSheet/BottomSheetOptionRow.swift,
-				Views/Components/Card/RecentRow.swift,
-				Views/Components/FileViewer/CameraReaderView.swift,
-				Views/Components/FileViewer/FileViewer.swift,
-				Views/Components/FileViewer/ImagePicker.swift,
-				Views/Components/FileViewer/ImageReaderView.swift,
-				Views/Components/FileViewer/LinkInputView.swift,
-				Views/Components/FileViewer/PDFKitView.swift,
-				Views/Components/FileViewer/PhotoReaderView.swift,
-				Views/Components/FileViewer/TextInputView.swift,
-				Views/Components/Header/HeaderPager.swift,
-				Views/Components/Header/HeaderSlide.swift,
-				Views/Home/HomeView.swift,
-				Views/Home/InputSourceTile.swift,
-				Views/Library/EmptyLibraryView.swift,
-				Views/Library/FileViewerView.swift,
-				Views/Library/FilterBar.swift,
-				Views/Library/LibraryView.swift,
-				Views/Profile/AboutView.swift,
-				Views/Profile/InfoRow.swift,
-				Views/Profile/ProfileView.swift,
-				Views/Profile/SettingsRow.swift,
+				"TTS-Prod-Info.plist",
 			);
 			target = D964FBCB2EA5565F006A2573 /* TTS Prod */;
 		};
@@ -171,7 +128,6 @@
 		D94AF8B52E9146650017C37C = {
 			isa = PBXGroup;
 			children = (
-				D9640AFA2EAD5452006A2573 /* TTS-Prod-Info.plist */,
 				D94AF8C02E9146650017C37C /* TTS */,
 				D964FF772EA7F575006A2573 /* Frameworks */,
 				D94AF8BF2E9146650017C37C /* Products */,
@@ -474,6 +430,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.01;
+				"OTHER_SWIFT_FLAGS[arch=*]" = "-DDEVELOPMENT\n-DDEVELOPMENT\n-DDEVELOPMENT";
 				PRODUCT_BUNDLE_IDENTIFIER = com.neuralsound.tts;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -510,6 +467,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.01;
+				"OTHER_SWIFT_FLAGS[arch=*]" = "-DDEVELOPMENT";
 				PRODUCT_BUNDLE_IDENTIFIER = com.neuralsound.tts;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -533,7 +491,7 @@
 				DEVELOPMENT_TEAM = W49J7LTUV4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "TTS-Prod-Info.plist";
+				INFOPLIST_FILE = "TTS/TTS-Prod-Info.plist";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs access to your camera to take photos.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to your photo library to select images.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -547,6 +505,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.01;
+				"OTHER_SWIFT_FLAGS[arch=*]" = "-DPRODUCTION\n-DPRODUCTION";
 				PRODUCT_BUNDLE_IDENTIFIER = com.neuralsound.tts;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -571,7 +530,7 @@
 				DEVELOPMENT_TEAM = W49J7LTUV4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "TTS-Prod-Info.plist";
+				INFOPLIST_FILE = "TTS/TTS-Prod-Info.plist";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs access to your camera to take photos.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to your photo library to select images.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -585,6 +544,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.01;
+				"OTHER_SWIFT_FLAGS[arch=*]" = "-DPRODUCTION";
 				PRODUCT_BUNDLE_IDENTIFIER = com.neuralsound.tts;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
