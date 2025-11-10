@@ -12,12 +12,7 @@ struct Voice: Identifiable, Codable {
     let name: String
     let language: String
     let accent: String
-    let mood: String
+    let mood: String?
     let type: String
     let voiceSampleId: String
-}
-
-enum VoiceType: String {
-    case Free = "Free"
-    case Premium = "Premium"
 }

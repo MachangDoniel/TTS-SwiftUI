@@ -70,6 +70,7 @@ struct LanguagePickerView: View {
                     }
                     .padding(.horizontal)
                     .padding(.vertical, 8)
+                    .padding(.top, 30)
                     .background(Color.black.opacity(0.95))
 //                    .overlay(
 //                        ZStack {
@@ -252,7 +253,7 @@ struct LanguagePickerView: View {
 
         tts.selectedVoiceSampleId = voice.voiceSampleId
         if voice.type == VoiceType.Free.rawValue {
-            tts.appVoice = .default
+            tts.appVoice = .system
         } else {
             // Any non-Free (e.g., Premium) should use backend flow
             tts.appVoice = .backend

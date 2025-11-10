@@ -21,36 +21,33 @@ struct RecentActivity: Identifiable, Codable, Equatable {
     var bookmarkData: Data?
 
     // Derived properties
-    var fileExtensionLowercased: String? {
+    var fileExtension: FileExtension {
         if let sp = sourcePath, !sp.isEmpty {
             if let url = URL(string: sp), url.scheme != nil {
-                let ext = url.pathExtension
-                if !ext.isEmpty { return ext.lowercased() }
-            }
-            if let ext = sp.split(separator: ".").last, sp.contains(".") {
-                return String(ext).lowercased()
+                return FileExtension(from: url.pathExtension)
+            } else if let ext = sp.split(separator: ".").last {
+                return FileExtension(from: String(ext))
             }
         }
-        if let ext = title.split(separator: ".").last, title.contains(".") {
-            return String(ext).lowercased()
+        if let ext = title.split(separator: ".").last {
+            return FileExtension(from: String(ext))
         }
-        return nil
-    }
-
-    enum FileCategory {
-        case pdf, text, image, other
+        return .unknown
     }
 
     var fileCategory: FileCategory {
         switch kind {
-        case .text: return .text
-        case .photos: return .image
+        case .text:
+            return .text
+        case .photos:
+            return .image
         default:
-            guard let ext = fileExtensionLowercased else { return .other }
-            if ext == "pdf" { return .pdf }
-            if ext == "txt" { return .text }
-            if ["png", "jpg", "jpeg", "heic"].contains(ext) { return .image }
-            return .other
+            switch fileExtension {
+            case .pdf: return .pdf
+            case .txt: return .text
+            case .png, .jpg, .jpeg, .heic: return .image
+            default: return .all
+            }
         }
     }
 
@@ -97,12 +94,10 @@ struct RecentActivity: Identifiable, Codable, Equatable {
     }
 
     // MARK: - Text Persistence Helpers
-    /// Saves the provided text as a UTF-8 .txt file in the app's Documents directory and returns a configured RecentActivity.
-    /// The file name is derived from the title with a .txt extension, and a UUID is appended to avoid collisions.
     static func makeTextActivity(title: String, text: String) throws -> RecentActivity {
         let sanitizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let base = sanitizedTitle.isEmpty ? "Text" : sanitizedTitle
-        let uniqueName = "\(base) - \(UUID().uuidString.prefix(8)).txt"
+        let uniqueName = "\(base) - \(UUID().uuidString.prefix(8)).\(FileExtension.txt.rawValue)"
         Logger.log("[RecentActivity] Creating .txt file: \(uniqueName)")
 
         let fm = FileManager.default

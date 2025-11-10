@@ -9,7 +9,7 @@ import SwiftUI
 
 struct LibraryView: View {
     @EnvironmentObject private var recentStore: RecentStore
-    @State private var selectedFilter: FileFilter = .all
+    @State private var selectedFilter: FileCategory = .all
     @State private var selectedDocumentURL: URL? = nil
     @EnvironmentObject private var tts: TTSPlayer
 
@@ -117,24 +117,18 @@ struct LibraryView: View {
         }
     }
 
-    // Filter logic based on FileFilter and item kind
+    // Filter logic based on FileCategory and item kind
     private var filteredItems: [RecentActivity] {
-        switch selectedFilter {
-        case .all:
-            return recentStore.items
-        case .pdf:
-            return recentStore.items.filter { item in
-                item.fileExtensionLowercased == "pdf"
-            }
-        case .text:
-            return recentStore.items.filter { item in
-                let ext = item.fileExtensionLowercased ?? ""
-                return ["txt", "md", "rtf"].contains(ext)
-            }
-        case .image:
-            return recentStore.items.filter { item in
-                let ext = item.fileExtensionLowercased ?? ""
-                return ["png","jpg","jpeg","heic","gif","tiff","bmp","webp"].contains(ext)
+        recentStore.items.filter { item in
+            switch selectedFilter {
+            case .all:
+                return true
+            case .pdf:
+                return item.fileExtension.isPDF
+            case .text:
+                return item.fileExtension.isText
+            case .image:
+                return item.fileExtension.isImage
             }
         }
     }

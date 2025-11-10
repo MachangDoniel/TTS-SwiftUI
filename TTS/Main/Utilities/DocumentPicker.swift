@@ -8,23 +8,39 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// A simple, type-safe wrapper for picking a single document from the Files app.
 struct DocumentPicker: UIViewControllerRepresentable {
-    var supportedTypes: [UTType] = [UTType.pdf, UTType.text, UTType.image]
+    /// Supported content types (defaults to PDF, text, image)
+    var supportedTypes: [UTType] = [
+        .pdf,
+        .text,
+        .plainText,
+        .image,
+        .png,
+        .jpeg
+    ]
+    
+    /// Callback when a file is successfully picked
     var onPick: (URL) -> Void
     
+    /// Optional callback if user cancels the picker
+    var onCancel: (() -> Void)? = nil
+
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: supportedTypes)
         picker.delegate = context.coordinator
         picker.allowsMultipleSelection = false
+        picker.shouldShowFileExtensions = true
         return picker
     }
     
     func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
-    
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
-    
+
+    // MARK: - Coordinator
     class Coordinator: NSObject, UIDocumentPickerDelegate {
         let parent: DocumentPicker
         
@@ -34,9 +50,20 @@ struct DocumentPicker: UIViewControllerRepresentable {
         
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
             guard let url = urls.first else { return }
-            parent.onPick(url)
+            
+            // Request security scoped access
+            if url.startAccessingSecurityScopedResource() {
+                parent.onPick(url)
+                url.stopAccessingSecurityScopedResource()
+            } else {
+                // Still call if access fails (for temporary files)
+                parent.onPick(url)
+            }
         }
         
-        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {}
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            parent.onCancel?()
+            Logger.log("DocumentPicker was cancelled by user")
+        }
     }
 }

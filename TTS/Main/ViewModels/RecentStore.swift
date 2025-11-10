@@ -21,11 +21,25 @@ final class RecentStore: ObservableObject {
     private let container: NSPersistentContainer
     private let context: NSManagedObjectContext
     
+    // MARK: - Entity + Attribute KeyString
+       private struct KeyString {
+           static let entity = "RecentActivityEntity"
+           static let id = "id"
+           static let modelName = "RecentModel"
+           static let objectName = "NSManagedObject"
+           static let title = "title"
+           static let sourcePath = "sourcePath"
+           static let kind = "kind"
+           static let createdAt = "createdAt"
+           static let thumbnailData = "thumbnailData"
+           static let bookmarkData = "bookmarkData"
+       }
+    
     init() {
         let model = Self.buildModel()
-        container = NSPersistentContainer(name: "RecentModel", managedObjectModel: model)
+        container = NSPersistentContainer(name: KeyString.modelName, managedObjectModel: model)
         let description = NSPersistentStoreDescription()
-        let storeURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("RecentModel.sqlite")
+        let storeURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("\(KeyString.modelName).sqlite")
         description.url = storeURL
         description.type = NSSQLiteStoreType
         description.shouldAddStoreAsynchronously = false
@@ -48,42 +62,42 @@ final class RecentStore: ObservableObject {
         
         // Entity: RecentActivityEntity
         let entity = NSEntityDescription()
-        entity.name = "RecentActivityEntity"
-        entity.managedObjectClassName = "NSManagedObject"
+        entity.name = KeyString.entity
+        entity.managedObjectClassName = KeyString.objectName
         
         // Attributes
         let idAttr = NSAttributeDescription()
-        idAttr.name = "id"
+        idAttr.name = KeyString.id
         idAttr.attributeType = .UUIDAttributeType
         idAttr.isOptional = false
         
         let titleAttr = NSAttributeDescription()
-        titleAttr.name = "title"
+        titleAttr.name = KeyString.title
         titleAttr.attributeType = .stringAttributeType
         titleAttr.isOptional = false
         
         let sourcePathAttr = NSAttributeDescription()
-        sourcePathAttr.name = "sourcePath"
+        sourcePathAttr.name = KeyString.sourcePath
         sourcePathAttr.attributeType = .stringAttributeType
         sourcePathAttr.isOptional = true
         
         let kindAttr = NSAttributeDescription()
-        kindAttr.name = "kind"
+        kindAttr.name = KeyString.kind
         kindAttr.attributeType = .stringAttributeType
         kindAttr.isOptional = false
         
         let createdAtAttr = NSAttributeDescription()
-        createdAtAttr.name = "createdAt"
+        createdAtAttr.name = KeyString.createdAt
         createdAtAttr.attributeType = .dateAttributeType
         createdAtAttr.isOptional = false
         
         let thumbAttr = NSAttributeDescription()
-        thumbAttr.name = "thumbnailData"
+        thumbAttr.name = KeyString.thumbnailData
         thumbAttr.attributeType = .binaryDataAttributeType
         thumbAttr.isOptional = true
         
         let bookmarkAttr = NSAttributeDescription()
-        bookmarkAttr.name = "bookmarkData"
+        bookmarkAttr.name = KeyString.bookmarkData
         bookmarkAttr.attributeType = .binaryDataAttributeType
         bookmarkAttr.isOptional = true
         
@@ -157,7 +171,7 @@ final class RecentStore: ObservableObject {
     }
     
     func remove(_ id: UUID) {
-        let fetch: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "RecentActivityEntity")
+        let fetch: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: KeyString.entity)
         fetch.predicate = NSPredicate(format: "id == %@", id as CVarArg)
         do {
             let toDelete = try context.fetch(fetch) as? [NSManagedObject] ?? []
@@ -170,7 +184,7 @@ final class RecentStore: ObservableObject {
     }
     
     func clear() {
-        let fetch: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "RecentActivityEntity")
+        let fetch: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: KeyString.entity)
         let batch = NSBatchDeleteRequest(fetchRequest: fetch)
         do {
             try context.execute(batch)
@@ -187,15 +201,15 @@ final class RecentStore: ObservableObject {
         guard !trimmed.isEmpty else { return }
         let display = sanitizeTitle(trimmed)
         
-        let fr = NSFetchRequest<NSManagedObject>(entityName: "RecentActivityEntity")
+        let fr = NSFetchRequest<NSManagedObject>(entityName: KeyString.entity)
         fr.predicate = NSPredicate(format: "id == %@", id as CVarArg)
         fr.fetchLimit = 1
         do {
             guard let obj = try context.fetch(fr).first else { return }
-            let kindRaw = (obj.value(forKey: "kind") as? String) ?? InputSource.files.rawValue
+            let kindRaw = (obj.value(forKey: KeyString.kind) as? String) ?? InputSource.files.rawValue
             let kind = InputSource(rawValue: kindRaw) ?? .files
-            let oldTitle = (obj.value(forKey: "title") as? String) ?? display
-            let oldSource = obj.value(forKey: "sourcePath") as? String
+            let oldTitle = (obj.value(forKey: KeyString.title) as? String) ?? display
+            let oldSource = obj.value(forKey: KeyString.sourcePath) as? String
             
             var updatedSource = oldSource
             
@@ -222,12 +236,12 @@ final class RecentStore: ObservableObject {
             }
             
             // Update Core Data object
-            obj.setValue(display, forKey: "title")
-            obj.setValue(updatedSource, forKey: "sourcePath")
+            obj.setValue(display, forKey: KeyString.title)
+            obj.setValue(updatedSource, forKey: KeyString.sourcePath)
             
             // Re-apply dedupe semantics: remove any other items that now conflict with this (kind, sourcePath/title)
             // Delete duplicates except this id
-            let dupFetch: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "RecentActivityEntity")
+            let dupFetch: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: KeyString.entity)
             if let sp = updatedSource, !sp.isEmpty {
                 dupFetch.predicate = NSPredicate(format: "kind == %@ AND sourcePath == %@ AND id != %@", kind.rawValue, sp, id as CVarArg)
             } else {
@@ -245,12 +259,12 @@ final class RecentStore: ObservableObject {
     
     // Delete activity; optionally remove underlying file
     func deleteItem(id: UUID, removeFile: Bool = false) {
-        let fr = NSFetchRequest<NSManagedObject>(entityName: "RecentActivityEntity")
+        let fr = NSFetchRequest<NSManagedObject>(entityName: KeyString.entity)
         fr.predicate = NSPredicate(format: "id == %@", id as CVarArg)
         fr.fetchLimit = 1
         do {
             if let obj = try context.fetch(fr).first {
-                if removeFile, let sp = obj.value(forKey: "sourcePath") as? String, !sp.isEmpty, FileManager.default.fileExists(atPath: sp) {
+                if removeFile, let sp = obj.value(forKey: KeyString.sourcePath) as? String, !sp.isEmpty, FileManager.default.fileExists(atPath: sp) {
                     do { try FileManager.default.removeItem(atPath: sp) } catch { /* ignore */ }
                 }
                 context.delete(obj)
@@ -279,7 +293,7 @@ final class RecentStore: ObservableObject {
     
     private func dedupAndInsert(_ activity: RecentActivity) {
         // Delete duplicates according to sourcePath if present, else by (kind,title)
-        let fetch: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "RecentActivityEntity")
+        let fetch: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: KeyString.entity)
         if let sp = activity.sourcePath, !sp.isEmpty {
             fetch.predicate = NSPredicate(format: "kind == %@ AND sourcePath == %@", activity.kind.rawValue, sp)
         } else {
@@ -291,15 +305,15 @@ final class RecentStore: ObservableObject {
             for obj in dups { context.delete(obj) }
             
             // Insert new object
-            let entity = NSEntityDescription.entity(forEntityName: "RecentActivityEntity", in: context)!
+            let entity = NSEntityDescription.entity(forEntityName: KeyString.entity, in: context)!
             let obj = NSManagedObject(entity: entity, insertInto: context)
-            obj.setValue(activity.id, forKey: "id")
-            obj.setValue(activity.title, forKey: "title")
-            obj.setValue(activity.sourcePath, forKey: "sourcePath")
-            obj.setValue(activity.kind.rawValue, forKey: "kind")
-            obj.setValue(activity.createdAt, forKey: "createdAt")
-            obj.setValue(activity.thumbnailData, forKey: "thumbnailData")
-            obj.setValue(activity.bookmarkData, forKey: "bookmarkData")
+            obj.setValue(activity.id, forKey: KeyString.id)
+            obj.setValue(activity.title, forKey: KeyString.title)
+            obj.setValue(activity.sourcePath, forKey: KeyString.sourcePath)
+            obj.setValue(activity.kind.rawValue, forKey: KeyString.kind)
+            obj.setValue(activity.createdAt, forKey: KeyString.createdAt)
+            obj.setValue(activity.thumbnailData, forKey: KeyString.thumbnailData)
+            obj.setValue(activity.bookmarkData, forKey: KeyString.bookmarkData)
             
             // Trim to maxItems by deleting older ones beyond limit
             try context.save()
@@ -312,8 +326,8 @@ final class RecentStore: ObservableObject {
     
     private func trimIfNeeded() {
         // Fetch count and delete older items beyond maxItems
-        let fr = NSFetchRequest<NSManagedObject>(entityName: "RecentActivityEntity")
-        fr.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+        let fr = NSFetchRequest<NSManagedObject>(entityName: KeyString.entity)
+        fr.sortDescriptors = [NSSortDescriptor(key: KeyString.createdAt, ascending: false)]
         do {
             let all = try context.fetch(fr)
             if all.count > maxItems {
@@ -327,20 +341,20 @@ final class RecentStore: ObservableObject {
     }
     
     private func load() {
-        let fr = NSFetchRequest<NSManagedObject>(entityName: "RecentActivityEntity")
-        fr.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+        let fr = NSFetchRequest<NSManagedObject>(entityName: KeyString.entity)
+        fr.sortDescriptors = [NSSortDescriptor(key: KeyString.createdAt, ascending: false)]
         fr.fetchLimit = maxItems
         do {
             let managed = try context.fetch(fr)
             let mapped: [RecentActivity] = managed.compactMap { obj in
-                let id = (obj.value(forKey: "id") as? UUID) ?? UUID()
-                let title = (obj.value(forKey: "title") as? String) ?? "Untitled"
-                let sourcePath = obj.value(forKey: "sourcePath") as? String
-                let kindRaw = (obj.value(forKey: "kind") as? String) ?? InputSource.files.rawValue
+                let id = (obj.value(forKey: KeyString.id) as? UUID) ?? UUID()
+                let title = (obj.value(forKey: KeyString.title) as? String) ?? "Untitled"
+                let sourcePath = obj.value(forKey: KeyString.sourcePath) as? String
+                let kindRaw = (obj.value(forKey: KeyString.kind) as? String) ?? InputSource.files.rawValue
                 let kind = InputSource(rawValue: kindRaw) ?? .files
-                let createdAt = (obj.value(forKey: "createdAt") as? Date) ?? Date()
-                let thumb = obj.value(forKey: "thumbnailData") as? Data
-                let bookmarkData = obj.value(forKey: "bookmarkData") as? Data
+                let createdAt = (obj.value(forKey: KeyString.createdAt) as? Date) ?? Date()
+                let thumb = obj.value(forKey: KeyString.thumbnailData) as? Data
+                let bookmarkData = obj.value(forKey: KeyString.bookmarkData) as? Data
                 return RecentActivity(id: id, title: title, sourcePath: sourcePath, kind: kind, createdAt: createdAt, thumbnailData: thumb, bookmarkData: bookmarkData)
             }
             DispatchQueue.main.async {

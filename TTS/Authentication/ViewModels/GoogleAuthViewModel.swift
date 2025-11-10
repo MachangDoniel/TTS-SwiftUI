@@ -54,6 +54,11 @@ final class GoogleAuthViewModel: ObservableObject {
                 userEmail = user.profile?.email
                 isSignedIn = true
                 authVM.saveTokenData() // ✅ persist token
+
+                let pictureURL = user.profile?.imageURL(withDimension: 200)?.absoluteString ?? ""
+                SettingsProvider.shared.name = user.profile?.name ?? ""
+                SettingsProvider.shared.email = user.profile?.email ?? ""
+                SettingsProvider.shared.pictureURL = pictureURL
             } else {
                 errorMessage = authVM.errorMessage ?? "Login failed"
             }
@@ -73,3 +78,4 @@ final class GoogleAuthViewModel: ObservableObject {
         backendToken = nil
     }
 }
+

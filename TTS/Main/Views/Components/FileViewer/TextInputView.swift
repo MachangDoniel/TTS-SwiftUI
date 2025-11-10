@@ -68,9 +68,9 @@ struct TextInputView: View {
             if let prefilled = prefilledText, inputText.isEmpty {
                 inputText = prefilled
                 tts.stop()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                    tts.startReading(prefilled)
-                }
+//                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+//                    tts.startReading(prefilled)
+//                }
             }
         }
     }
@@ -162,3 +162,4 @@ private extension NSRange {
     TextInputView(tts: TTSPlayer(), prefilledText: "Example prefilled text from a link...")
         .preferredColorScheme(.dark)
 }
+

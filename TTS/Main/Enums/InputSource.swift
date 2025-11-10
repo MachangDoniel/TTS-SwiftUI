@@ -55,11 +55,18 @@ enum InputSource: String, CaseIterable, Identifiable, Codable {
         return [.files, .gdrive, .photos, .scan, .dbox, .book, .text, .link]
     }
     
-    var fileCategory: RecentActivity.FileCategory {
-            switch self {
-            case .text: return .text
-            case .photos: return .image
-            case .files, .book, .dbox, .gdrive, .link, .scan: return .other
-            }
-        }
+    var fileCategory: FileCategory {
+           switch self {
+           case .text:
+               return .text
+           case .photos:
+               return .image
+           case .files, .book, .dbox:
+               return .pdf  // assuming most imported documents are PDFs
+           case .scan:
+               return .image
+           case .gdrive, .link:
+               return .all  // these can contain mixed types
+           }
+       }
 }

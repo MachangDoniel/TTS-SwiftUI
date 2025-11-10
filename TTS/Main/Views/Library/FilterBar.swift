@@ -10,12 +10,12 @@ import SwiftUI
 
 // MARK: - Filter Bar
 struct FilterBar: View {
-    @Binding var selected: FileFilter
+    @Binding var selected: FileCategory
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
-                ForEach(FileFilter.allCases, id: \.self) { filter in
+                ForEach(FileCategory.allCases, id: \.self) { filter in
                     Button {
                         selected = filter
                     } label: {

@@ -21,7 +21,16 @@ struct VoiceCard: View {
                 Text(voice.name)
                     .font(.headline)
                     .foregroundColor(.white)
-                Text("\(voice.language) • \(voice.accent) • \(voice.mood)")
+                
+                let subtitle: String = {
+                    var parts = [voice.language, voice.accent]
+                    if let mood = voice.mood, !mood.isEmpty {
+                        parts.append(mood)
+                    }
+                    return parts.joined(separator: " • ")
+                }()
+                
+                Text(subtitle)
                     .font(.subheadline)
                     .foregroundColor(.gray)
             }
@@ -70,3 +79,4 @@ struct VoiceCard_Previews: PreviewProvider {
         .previewLayout(.sizeThatFits)
     }
 }
+

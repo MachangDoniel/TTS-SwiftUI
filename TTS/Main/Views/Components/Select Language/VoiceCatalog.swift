@@ -45,7 +45,7 @@ final class VoiceCatalog: ObservableObject {
                 name: avVoice.name,
                 language: Locale.current.localizedString(forIdentifier: avVoice.language) ?? avVoice.language,
                 accent: avVoice.language.components(separatedBy: "-").last ?? "",
-                mood: "Default",
+                mood: nil,
                 type: VoiceType.Free.rawValue,
                 voiceSampleId: avVoice.identifier
             )
