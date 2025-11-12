@@ -68,7 +68,7 @@ struct WebReaderView: View {
                 dismiss()
                 tts.stop() // ✅ stop current speech before new one
                 onExtracted(text)
-                tts.startReading(text)
+                tts.startReading(text, title: pageTitle)
                 Logger.log("✅ Extracted text from web page (\(text.count) chars) — title: \(pageTitle)")
             }
         }

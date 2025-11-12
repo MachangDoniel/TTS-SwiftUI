@@ -237,106 +237,21 @@ struct LanguagePickerView: View {
     // MARK: - Voice Selection Logic
 
     private func selectVoice(_ voice: Voice) {
-        // update voice id and mode
         errorMessage = nil
         isLoading = true
 
-        // Snapshot BEFORE stopping or changing routing
-        let snapshotSentences = tts.sentences
-        let snapshotCurrent = tts.currentSentenceText
-
-        // Helper to normalize matching
-        func normalize(_ s: String) -> String {
-            s.trimmingCharacters(in: .whitespacesAndNewlines)
-             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-        }
-
-        tts.selectedVoiceSampleId = voice.voiceSampleId
-        if voice.type == VoiceType.Free.rawValue {
-            tts.appVoice = .system
-        } else {
-            // Any non-Free (e.g., Premium) should use backend flow
-            tts.appVoice = .backend
-        }
-
-        Logger.debugPrint("🎙 Selected voice=\(voice.name) type=\(voice.type) → routing=\(tts.appVoice == .backend ? "backend" : "local")")
-
         Task { @MainActor in
-            do {
-                // Use snapshots captured BEFORE stopping
-                let sentences = snapshotSentences
-                let currentSentence = snapshotCurrent
+            let targetMode: AppVoiceMode = (voice.type == VoiceType.Free.rawValue) ? .system : .backend
 
-                // Robust index match using normalization
-                let normCurrent = normalize(currentSentence)
-                let currentIndex: Int? = sentences.firstIndex { normalize($0) == normCurrent }
-
-                // Determine routing change (free <-> premium)
-                let isPremiumSelected = (voice.type != VoiceType.Free.rawValue)
-                let previousWasBackend = (tts.appVoice == .backend) // appVoice currently reflects target routing; if you track previous routing, inject it here
-                let routingChanged = previousWasBackend != isPremiumSelected
-
-                // Choose resume index: next sentence if routing changed and no active current, else keep current
-                let resumeIndex: Int? = {
-                    if let idx = currentIndex, !sentences.isEmpty {
-                        if routingChanged {
-                            return normCurrent.isEmpty ? min(idx + 1, sentences.count - 1) : idx
-                        } else {
-                            return idx
-                        }
-                    }
-                    return nil
-                }()
-
-                // Build text to read from resume index onward
-                let textToRead: String = {
-                    if let idx = resumeIndex, !sentences.isEmpty {
-                        return sentences[idx...].joined(separator: " ")
-                    }
-                    if !currentSentence.isEmpty { return currentSentence }
-                    return sentences.joined(separator: " ")
-                }()
-
-                // Remaining chunks estimate for backend task creation
-                let remainingChunks: Int = {
-                    if let idx = resumeIndex { return max(sentences.count - idx, 0) }
-                    return max(sentences.count - (currentIndex ?? 0), 0)
-                }()
-                Logger.debugPrint("📦 Backend remaining chunks estimate: \(remainingChunks)")
-
-                // Stop current speech now (after snapshot)
-                tts.stop()
-
-                // Align highlighting to the sentence we will start from
-                if let idx = resumeIndex, !sentences.isEmpty {
-                    tts.currentSentenceText = sentences[idx]
-                } else if !currentSentence.isEmpty {
-                    tts.currentSentenceText = currentSentence
-                }
-
-                // Restart reading
-                if !textToRead.isEmpty {
-                    try await tts.startReading(textToRead)
-                } else {
-                    Logger.debugPrint("ℹ️ No text to read.")
-                }
-
-                // Success → stop loading
-                isLoading = false
-            } catch {
-                // Failure → show error and pause control
-                isLoading = false
-                errorMessage = (error as NSError).localizedDescription
-                Logger.debugPrint("🗣 ❌ Failed to start reading: \(error.localizedDescription)")
-
-                // Auto-dismiss the error banner after a short delay
-                Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    if errorMessage == (error as NSError).localizedDescription {
-                        withAnimation { errorMessage = nil }
-                    }
-                }
+            if tts.appVoice != targetMode {
+                tts.updateVoiceMode(targetMode)
             }
+
+            tts.updateSelectedVoiceSampleId(voice.voiceSampleId)
+
+            Logger.debugPrint("🎙 Selected voice=\(voice.name) type=\(voice.type) → routing=\(targetMode == .backend ? "backend" : "local")")
+
+            isLoading = false
         }
     }
 }

@@ -38,30 +38,12 @@ final class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, 
     @Published var currentSentenceText: String = ""
     @Published var currentWordInSentence: String = ""
     @Published var currentWordRange: NSRange? = nil
+    @Published var currentWordIndexInSentence: Int? = nil
+    @Published var position: TTSPosition = .init(sentenceIndex: 0, wordNSRange: nil, wordIndex: nil)
     @Published var currentTitle: String? = nil
     @Published var currentURL: URL? = nil
-    @Published var appVoice: AppVoiceMode = .system {
-        didSet {
-            // On voice mode change, stop current playback and reset currentSentenceText to keep highlight in sync.
-            stop()
-            if sentences.indices.contains(currentIndex) {
-                currentSentenceText = sentences[currentIndex]
-            } else {
-                currentSentenceText = ""
-            }
-        }
-    }
-    @Published var selectedVoiceSampleId: String = "1" {
-        didSet {
-            // On voice sample change, stop current playback and reset currentSentenceText to keep highlight in sync.
-            stop()
-            if sentences.indices.contains(currentIndex) {
-                currentSentenceText = sentences[currentIndex]
-            } else {
-                currentSentenceText = ""
-            }
-        }
-    }
+    @Published var appVoice: AppVoiceMode = .system
+    @Published var selectedVoiceSampleId: String = "1"
 
     // MARK: - Dependencies
     private let config: TTSConfiguration
@@ -85,27 +67,41 @@ final class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, 
 
     // MARK: - Public API
 
-    func startReading(_ text: String) {
-        stop()
-        sentences = parser.splitIntoSentencesPreservingHeadings(text)
+    func prepare(text: String, url: URL?, title: String?) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            resetSession()
+            currentURL = url
+            currentTitle = title
+            return
+        }
+
+        sentences = parser.splitIntoSentencesPreservingHeadings(trimmed)
         currentIndex = 0
-
-        // Always update currentSentenceText to current sentence for highlight syncing
-        if sentences.indices.contains(currentIndex) {
-            currentSentenceText = sentences[currentIndex]
-        } else {
-            currentSentenceText = ""
-        }
-
-        state = .playing
+        currentSentenceText = sentences.first ?? ""
+        currentWordInSentence = ""
+        currentWordRange = nil
+        currentWordIndexInSentence = nil
+        position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
+        currentURL = url
+        currentTitle = title
         progress = 0.0
-
-        switch appVoice {
-        case .system: speakCurrentSentence_Apple()
-        case .backend: startBackendFlow()
-        }
+        state = .idle
+    }
+    
+    func startReading(_ text: String, url: URL? = nil, title: String? = nil) {
+        // Prepare and immediately start from the beginning
+        prepare(text: text, url: url ?? currentURL, title: title ?? currentTitle)
+        playFromCurrent()
     }
 
+    func playFromCurrent() {
+        guard !sentences.isEmpty, sentences.indices.contains(currentIndex) else { return }
+        state = .playing
+        progress = Double(currentIndex) / Double(max(1, sentences.count))
+        playCurrentSentence(resumeAt: currentIndex)
+    }
+    
     func togglePlayPause() {
         switch appVoice {
         case .system:
@@ -121,14 +117,38 @@ final class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, 
         synthesizer.stopSpeaking(at: .immediate)
         audioPlayer?.stop()
         audioPlayer = nil
+        backendWorker.stopCurrent(player: self)
+        backendWorker.cancelGenerationOnly(keepingAudio: true)
+        // Preserve sentences and index so highlight and position remain
+        currentWordInSentence = ""
+        currentWordRange = nil
+        currentWordIndexInSentence = nil
+        position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
+        progress = Double(currentIndex) / Double(max(1, sentences.count))
+        state = .idle
+    }
+    
+    func resetSession() {
+        // Fully clear all state (use when switching files)
+        synthesizer.stopSpeaking(at: .immediate)
+        synthesizer.delegate = nil
+        synthesizer = AVSpeechSynthesizer()
+        synthesizer.delegate = self
+
+        audioPlayer?.stop()
+        audioPlayer = nil
         backendWorker.cancel()
         sentences.removeAll()
         currentIndex = 0
         currentSentenceText = ""
         currentWordInSentence = ""
         currentWordRange = nil
+        currentWordIndexInSentence = nil
+        position = .init(sentenceIndex: 0, wordNSRange: nil, wordIndex: nil)
         progress = 0.0
         state = .idle
+        currentTitle = nil
+        currentURL = nil
     }
 
     func nextSentence() {
@@ -137,6 +157,7 @@ final class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, 
         case .system:
             // Ensured MainActor for smooth UI updates (free mode)
             Task { @MainActor in
+                synthesizer.stopSpeaking(at: .immediate)
                 currentIndex += 1
                 // Sync highlight text to new sentence after index change
                 if sentences.indices.contains(currentIndex) {
@@ -144,10 +165,26 @@ final class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, 
                 } else {
                     currentSentenceText = ""
                 }
+                currentWordInSentence = ""
+                currentWordRange = nil
+                state = .playing
+                progress = Double(currentIndex) / Double(max(1, sentences.count))
                 speakCurrentSentence_Apple()
             }
         case .backend:
+            backendWorker.stopCurrent(player: self)
             currentIndex += 1
+            if sentences.indices.contains(currentIndex) {
+                currentSentenceText = sentences[currentIndex]
+            } else {
+                currentSentenceText = ""
+            }
+            currentWordInSentence = ""
+            currentWordRange = nil
+            currentWordIndexInSentence = nil
+            position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
+            state = .playing
+            progress = Double(currentIndex) / Double(max(1, sentences.count))
             backendWorker.playNext(from: currentIndex, sentences: sentences, player: self)
         }
     }
@@ -158,6 +195,7 @@ final class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, 
         case .system:
             // Ensured MainActor for smooth UI updates (free mode)
             Task { @MainActor in
+                synthesizer.stopSpeaking(at: .immediate)
                 currentIndex -= 1
                 // Sync highlight text to new sentence after index change
                 if sentences.indices.contains(currentIndex) {
@@ -165,10 +203,26 @@ final class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, 
                 } else {
                     currentSentenceText = ""
                 }
+                currentWordInSentence = ""
+                currentWordRange = nil
+                state = .playing
+                progress = Double(currentIndex) / Double(max(1, sentences.count))
                 speakCurrentSentence_Apple()
             }
         case .backend:
+            backendWorker.stopCurrent(player: self)
             currentIndex -= 1
+            if sentences.indices.contains(currentIndex) {
+                currentSentenceText = sentences[currentIndex]
+            } else {
+                currentSentenceText = ""
+            }
+            currentWordInSentence = ""
+            currentWordRange = nil
+            currentWordIndexInSentence = nil
+            position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
+            state = .playing
+            progress = Double(currentIndex) / Double(max(1, sentences.count))
             backendWorker.playPrevious(from: currentIndex, sentences: sentences, player: self)
         }
     }
@@ -201,8 +255,76 @@ final class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, 
             synthesizer.continueSpeaking()
             state = .playing
         case .idle, .finished:
-            speakCurrentSentence_Apple()
+            playFromCurrent()
+        }
+    }
+    
+    // MARK: - Seamless Voice Switching
+    func updateVoiceMode(_ mode: AppVoiceMode) {
+        guard appVoice != mode else { return }
+        let previousMode = appVoice
+        appVoice = mode
+
+        switch (previousMode, mode) {
+        case (.system, .backend):
+            // Let current Apple sentence finish; backend flow will start on next sentence
+            backendWorker.cancelGenerationOnly(keepingAudio: true)
+        case (.backend, .system):
+            backendWorker.cancel()
+            if state == .playing {
+                // Resume Apple speech from current sentence
+                synthesizer.stopSpeaking(at: .immediate)
+                currentWordInSentence = ""
+                currentWordRange = nil
+                speakCurrentSentence_Apple()
+                state = .playing
+            }
+        default:
+            break
+        }
+    }
+    
+    func updateSelectedVoiceSampleId(_ voiceId: String) {
+        let oldId = selectedVoiceSampleId
+        selectedVoiceSampleId = voiceId
+        guard appVoice == .system else {
+            // Backend picks up new voice for future chunks
+            backendWorker.refreshVoice(
+                with: voiceId,
+                currentIndex: currentIndex,
+                sentences: sentences,
+                player: self
+            )
+            return
+        }
+        guard state == .playing else { return }
+        guard oldId != voiceId else { return }
+        // For Apple engine: restart the remaining text of the current sentence with new voice
+        // Compute remaining substring based on currentWordRange
+        let sentence = currentSentenceText
+        let remaining: String = {
+            if let range = currentWordRange,
+               let swiftRange = Range(range, in: sentence) {
+                return String(sentence[swiftRange.lowerBound...])
+            }
+            return sentence
+        }()
+        synthesizer.stopSpeaking(at: .immediate)
+        currentWordInSentence = ""
+        currentWordRange = nil
+        if !remaining.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let utterance = AVSpeechUtterance(string: remaining)
+            if let sysVoice = AVSpeechSynthesisVoice(identifier: selectedVoiceSampleId) {
+                utterance.voice = sysVoice
+            } else {
+                utterance.voice = AVSpeechSynthesisVoice(language: config.language)
+            }
+            utterance.rate = config.rate
+            synthesizer.speak(utterance)
             state = .playing
+        } else {
+            // Nothing remaining → move to next sentence
+            speechSynthesizer(synthesizer, didFinish: AVSpeechUtterance(string: sentence))
         }
     }
 
@@ -213,11 +335,14 @@ final class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, 
         currentWordRange = range
         let nsText = utterance.speechString as NSString
         currentWordInSentence = nsText.substring(with: range)
+        currentWordIndexInSentence = estimateWordIndex(in: utterance.speechString, range: range)
+        position = .init(sentenceIndex: currentIndex, wordNSRange: currentWordRange, wordIndex: currentWordIndexInSentence)
     }
 
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer,
                            didFinish utterance: AVSpeechUtterance) {
         currentWordInSentence = ""
+        currentWordIndexInSentence = nil
         progress = Double(currentIndex + 1) / Double(max(1, sentences.count))
         if currentIndex < sentences.count - 1 {
             currentIndex += 1
@@ -227,15 +352,23 @@ final class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, 
             } else {
                 currentSentenceText = ""
             }
-            speakCurrentSentence_Apple()
+            currentWordInSentence = ""
+            currentWordRange = nil
+            currentWordIndexInSentence = nil
+            position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
+            state = .playing
+            playCurrentSentence(resumeAt: currentIndex)
         } else {
             state = .finished
+            position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
         }
     }
 
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer,
                            didCancel utterance: AVSpeechUtterance) {
         currentWordInSentence = ""
+        currentWordIndexInSentence = nil
+        position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
     }
 
     // MARK: - Backend Flow
@@ -265,6 +398,36 @@ final class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, 
     // MARK: - AVAudioPlayerDelegate
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         backendWorker.handleAudioFinished(player: self)
+    }
+
+    private func playCurrentSentence(resumeAt: Int) {
+        switch appVoice {
+        case .system:
+            speakCurrentSentence_Apple()
+        case .backend:
+            backendWorker.startFlow(
+                sentences: sentences,
+                currentIndex: currentIndex,
+                selectedVoiceSampleId: selectedVoiceSampleId,
+                player: self,
+                resumeAt: resumeAt
+            )
+        }
+    }
+
+    // MARK: - Position helpers
+    struct TTSPosition {
+        var sentenceIndex: Int
+        var wordNSRange: NSRange?
+        var wordIndex: Int?
+    }
+
+    private func estimateWordIndex(in sentence: String, range: NSRange) -> Int? {
+        guard let r = Range(range, in: sentence) else { return nil }
+        let prefix = sentence[sentence.startIndex..<r.lowerBound]
+        // Split by whitespace; basic tokenization (normalizer can replace)
+        let tokens = prefix.split { $0.isWhitespace }.count
+        return tokens
     }
 }
 

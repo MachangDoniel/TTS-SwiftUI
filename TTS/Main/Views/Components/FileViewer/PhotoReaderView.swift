@@ -137,7 +137,10 @@ struct PhotoReaderView: View {
                     wordBoxes = boxes
 
                     tts.stop()
-                    tts.startReading(combined)
+                    tts.startReading(
+                        combined,
+                        title: tts.currentTitle ?? "Photo Reader"
+                    )
                 }
             }
 

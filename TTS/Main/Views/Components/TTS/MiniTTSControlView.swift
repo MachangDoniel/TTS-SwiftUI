@@ -13,7 +13,7 @@ struct MiniTTSControlView: View {
     var onTap: (() -> Void)? = nil
 
     var body: some View {
-        let isPlaying = (ttsPlayer.isSpeaking && !ttsPlayer.isPaused)
+        let isPlaying = (ttsPlayer.state == .playing)
         let subtitle = isPlaying ? "Playing" : "Paused"
 
         ZStack(alignment: .bottomLeading) {

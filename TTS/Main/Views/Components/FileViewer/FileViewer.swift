@@ -24,57 +24,12 @@ struct FileViewer: View {
     @State private var isImage: Bool = false
     @State private var uiImage: UIImage? = nil
     
+    @StateObject private var highlightCoordinator = HighlightCoordinator()
+
     var body: some View {
         VStack(spacing: 0) {
             // MARK: - File Content
-            if fileURL.pathExtension.lowercased() == "pdf" {
-                PDFKitView(url: fileURL, tts: tts)
-                
-            } else if ["png", "jpg", "jpeg", "heic"].contains(fileURL.pathExtension.lowercased()) {
-                if let img = uiImage {
-                    Image(uiImage: img)
-                        .resizable()
-                        .scaledToFit()
-                        .background(Color.black)
-                        .onAppear { performOCRIfNeeded() }
-                } else {
-                    ProgressView("Loading image...")
-                        .onAppear { loadImage() }
-                }
-                
-            } else if fileURL.pathExtension.lowercased() == "txt" {
-                ScrollView {
-                    if tts.sentences.isEmpty {
-                        // Before reading starts, show raw text
-                        Text(extractedText.isEmpty ? "Loading..." : extractedText)
-                            .font(.system(size: 18))
-                            .foregroundColor(.white.opacity(0.8))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding()
-                    } else {
-                        // During speech, show per-sentence highlights
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(Array(tts.sentences.enumerated()), id: \.offset) { index, sentence in
-                                SentenceLineView(
-                                    sentence: sentence,
-                                    isActive: index == tts.currentIndex,
-                                    wordRange: index == tts.currentIndex ? tts.currentWordRange : nil
-                                )
-                            }
-                        }
-                        .padding()
-                    }
-                }
-                .background(Color.black)
-                .onAppear {
-                    loadText()
-                }
-                
-            } else {
-                Text("Unsupported file type")
-                    .foregroundColor(.gray)
-                    .padding()
-            }
+            fileContentView
             
             // MARK: - Controls
             TTSControlView(tts: tts, text: extractedText)
@@ -82,7 +37,7 @@ struct FileViewer: View {
         .onAppear {
             // If switching to a different file, stop the old one; otherwise keep speaking
             if let current = tts.currentURL, current != fileURL {
-                tts.stop()
+                tts.resetSession()
             }
 
             tts.currentTitle = fileURL.lastPathComponent
@@ -92,23 +47,84 @@ struct FileViewer: View {
             case "pdf":
                 let text = extractText(from: fileURL)
                 extractedText = text
-                // Only start if not already speaking this file
-                if tts.currentURL != fileURL || !tts.isSpeaking {
-                    startSpeech(with: text)
-                }
+                // Prepare only; manual play via controls
+                tts.prepare(text: text, url: fileURL, title: fileURL.lastPathComponent)
 
             case "txt":
-                loadText() // startSpeech is gated inside loadText
+                loadText() // prepare is gated inside loadText
 
             default:
                 detectFileType()
-                // For images/others, OCR will trigger start if needed
+                // For images/others, OCR will trigger prepare if needed
             }
         }
         .navigationTitle(fileURL.lastPathComponent)
         .navigationBarTitleDisplayMode(.inline)
         .background(Color.black.ignoresSafeArea())
         .preferredColorScheme(.dark)
+    }
+    
+    private var fileContentView: some View {
+        Group {
+            if fileURL.pathExtension.lowercased() == "pdf" {
+                PDFKitView(url: fileURL, tts: tts)
+                    .onAppear {
+                        if let doc = PDFDocument(url: fileURL) {
+                            highlightCoordinator.setDocument(.pdf(document: doc))
+                        }
+                    }
+            } else if ["png", "jpg", "jpeg", "heic"].contains(fileURL.pathExtension.lowercased()) {
+                Group {
+                    if let img = uiImage {
+                        Image(uiImage: img)
+                            .resizable()
+                            .scaledToFit()
+                            .background(Color.black)
+                            .onAppear { performOCRIfNeeded() }
+                    } else {
+                        ProgressView("Loading image...")
+                            .onAppear { loadImage() }
+                    }
+                }
+            } else if fileURL.pathExtension.lowercased() == "txt" {
+                textContentView
+            } else {
+                Text("Unsupported file type")
+                    .foregroundColor(.gray)
+                    .padding()
+            }
+        }
+    }
+    
+    private var textContentView: some View {
+        ScrollView {
+            if tts.sentences.isEmpty {
+                Text(extractedText.isEmpty ? "Loading..." : extractedText)
+                    .font(.system(size: 18))
+                    .foregroundColor(.white.opacity(0.8))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(tts.sentences.enumerated()), id: \.offset) { index, sentence in
+                        SentenceRow(
+                            index: index,
+                            sentence: sentence,
+                            isActive: index == tts.currentIndex,
+                            currentWordRange: index == tts.currentIndex ? tts.currentWordRange : nil,
+                            currentWordIndex: tts.currentWordIndexInSentence ?? 0,
+                            position: tts.position,
+                            coordinator: highlightCoordinator
+                        )
+                    }
+                }
+                .padding()
+            }
+        }
+        .background(Color.black)
+        .onAppear {
+            highlightCoordinator.setDocument(.plainText(text: extractedText))
+        }
     }
     
     // MARK: - File Handlers
@@ -131,8 +147,12 @@ struct FileViewer: View {
                let content = String(data: data, encoding: .utf8) {
                 DispatchQueue.main.async {
                     self.extractedText = content
-                    if self.tts.currentURL != self.fileURL || !self.tts.isSpeaking {
-                        self.startSpeech(with: content)
+                    if self.tts.currentURL != self.fileURL || self.tts.sentences.isEmpty {
+                        self.tts.prepare(
+                            text: content,
+                            url: self.fileURL,
+                            title: self.fileURL.lastPathComponent
+                        )
                     }
                 }
             } else {
@@ -163,30 +183,6 @@ struct FileViewer: View {
         }
     }
     
-    private func startSpeech(with text: String) {
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        
-        if tts.currentURL == fileURL && tts.isSpeaking {
-            // Already speaking this file; do not restart
-            return
-        }
-        
-        if tts.currentURL != fileURL {
-            // New file: reset synthesizer and reading state
-            tts.synthesizer.delegate = nil
-            tts.synthesizer = AVSpeechSynthesizer()
-            tts.synthesizer.delegate = tts
-            tts.currentURL = fileURL
-            tts.currentIndex = 0
-            tts.currentWordRange = nil
-            tts.currentWordInSentence = ""
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            tts.startReading(text)
-        }
-    }
-    
     private func performOCRIfNeeded() {
         guard isImage, let img = uiImage else { return }
         if !extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return }
@@ -204,7 +200,11 @@ struct FileViewer: View {
             DispatchQueue.main.async {
                 self.extractedText = text.isEmpty ? "No text detected." : text
                 if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    self.startSpeech(with: text)
+                    self.tts.prepare(
+                        text: text,
+                        url: self.fileURL,
+                        title: self.fileURL.lastPathComponent
+                    )
                 }
             }
         }
@@ -228,8 +228,38 @@ struct FileViewer: View {
     }
 }
 
+private struct SentenceRow: View {
+    let index: Int
+    let sentence: String
+    let isActive: Bool
+    let currentWordRange: NSRange?
+    let currentWordIndex: Int
+    let position: TTSPlayer.TTSPosition
+    @ObservedObject var coordinator: HighlightCoordinator
+    
+    private var positionToken: String { String(describing: position) }
+
+    var body: some View {
+        SentenceLineView(
+            sentence: sentence,
+            isActive: isActive,
+            wordRange: currentWordRange
+        )
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .onChange(of: positionToken) { _ in
+                        guard isActive else { return }
+                        let span = SentenceSpan(index: index, text: sentence, nsRange: nil)
+                        let wspan = currentWordRange.map { WordSpan(nsRange: $0, tokenIndex: currentWordIndex) }
+                        coordinator.updateHighlight(sentence: span, word: wspan, containerSize: geo.size)
+                    }
+            }
+        )
+    }
+}
+
 // MARK: - Highlight View for Sentences
-import SwiftUI
 
 struct SentenceLineView: View {
     let sentence: String
@@ -290,7 +320,8 @@ struct SentenceLineView: View {
         label.lineBreakMode = .byWordWrapping
         label.frame = CGRect(origin: .zero, size: size)
 
-        let textStorage = NSTextStorage(string: sentence, attributes: [.font: label.font!])
+        let font = label.font ?? UIFont.systemFont(ofSize: 18)
+        let textStorage = NSTextStorage(string: sentence, attributes: [.font: font])
         let layoutManager = NSLayoutManager()
         let textContainer = NSTextContainer(size: size)
         textContainer.lineFragmentPadding = 0

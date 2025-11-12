@@ -137,7 +137,10 @@ struct CameraReaderView: View {
                     wordBoxes = boxes
 
                     tts.stop()
-                    tts.startReading(combined)
+                    tts.startReading(
+                        combined,
+                        title: tts.currentTitle ?? "Camera Capture"
+                    )
                 }
             }
 

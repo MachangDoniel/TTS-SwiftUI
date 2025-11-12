@@ -28,7 +28,7 @@ struct TabBarView: View {
     @State private var prefilledLinkText: String? = nil
     
     @StateObject private var recentStore = RecentStore()
-    @StateObject private var tts = TTSPlayer()
+    @EnvironmentObject var tts: TTSPlayer
 
     var body: some View {
         NavigationStack {

@@ -176,7 +176,10 @@ struct ImageReaderView: View {
 
                     // ✅ Start reading automatically
                     tts.stop()
-                    tts.startReading(combined)
+                    tts.startReading(
+                        combined,
+                        title: tts.currentTitle ?? "Image Reader"
+                    )
 
                     // ✅ Auto-save the cropped image after OCR
                     saveImageToDisk()

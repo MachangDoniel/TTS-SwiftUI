@@ -61,9 +61,18 @@ struct TTSControlView: View {
 
                 // Play / Pause
                 Button(action: {
-                    if !tts.isSpeaking {
-                        tts.startReading(text)
-                    } else {
+                    if tts.sentences.isEmpty {
+                        tts.prepare(
+                            text: text,
+                            url: tts.currentURL,
+                            title: tts.currentTitle
+                        )
+                    }
+
+                    switch tts.state {
+                    case .idle, .finished:
+                        tts.playFromCurrent()
+                    case .playing, .paused:
                         tts.togglePlayPause()
                     }
                 }) {
@@ -71,11 +80,13 @@ struct TTSControlView: View {
                         Circle()
                             .fill(Color.blue)
                             .frame(width: 70, height: 70)
-                        Image(systemName: tts.isPaused ? "play.fill" : "pause.fill")
+                        Image(systemName: tts.state == .playing ? "pause.fill" : "play.fill")
                             .font(.system(size: 30, weight: .bold))
                             .foregroundColor(.white)
                     }
                 }
+                .disabled(tts.sentences.isEmpty)
+                .animation(.easeInOut(duration: 0.15), value: tts.state)
 
                 // Forward (next sentence)
                 Button(action: {
