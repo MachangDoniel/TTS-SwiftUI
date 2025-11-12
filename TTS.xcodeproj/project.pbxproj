@@ -6,13 +6,92 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D95125CC2EA52A6600C202AD /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = D95125CB2EA52A6600C202AD /* Alamofire */; };
+		D964002D2EA80491006A2573 /* Mantis in Frameworks */ = {isa = PBXBuildFile; productRef = D964002C2EA80491006A2573 /* Mantis */; };
+		D964002F2EA80497006A2573 /* Mantis in Frameworks */ = {isa = PBXBuildFile; productRef = D964002E2EA80497006A2573 /* Mantis */; };
+		D964FBC82EA5469A006A2573 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = D964FBC72EA5469A006A2573 /* GoogleSignIn */; };
+		D964FBCA2EA5469A006A2573 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = D964FBC92EA5469A006A2573 /* GoogleSignInSwift */; };
+		D964FBD32EA5565F006A2573 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = D964FBD02EA5565F006A2573 /* GoogleSignInSwift */; };
+		D964FBD42EA5565F006A2573 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = D964FBCC2EA5565F006A2573 /* Alamofire */; };
+		D964FBD52EA5565F006A2573 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = D964FBCE2EA5565F006A2573 /* GoogleSignIn */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D95126422EA53E0F00C202AD /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D964FBD72EA5565F006A2573 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		D94AF8BE2E9146650017C37C /* TTS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TTS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D964FBDB2EA5565F006A2573 /* TTS Prod.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "TTS Prod.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		D95125C02EA4CE5400C202AD /* Exceptions for "TTS" folder in "TTS" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Extension/Color.swift,
+				Info.plist,
+				"TTS-Prod-Info.plist",
+			);
+			target = D94AF8BD2E9146650017C37C /* TTS */;
+		};
+		D964FBDC2EA5565F006A2573 /* Exceptions for "TTS" folder in "TTS Prod" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Extension/Color.swift,
+				Info.plist,
+				"TTS-Prod-Info.plist",
+			);
+			target = D964FBCB2EA5565F006A2573 /* TTS Prod */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		D95125C12EA4CE5400C202AD /* Exceptions for "TTS" folder in "Copy Bundle Resources" phase from "TTS" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			buildPhase = D94AF8BC2E9146650017C37C /* Resources */;
+			membershipExceptions = (
+				Extension/Color.swift,
+			);
+		};
+		D964FEC12EA63CE0006A2573 /* Exceptions for "TTS" folder in "Copy Bundle Resources" phase from "TTS Prod" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			buildPhase = D964FBD62EA5565F006A2573 /* Resources */;
+			membershipExceptions = (
+				Extension/Color.swift,
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		D94AF8C02E9146650017C37C /* TTS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D95125C02EA4CE5400C202AD /* Exceptions for "TTS" folder in "TTS" target */,
+				D95125C12EA4CE5400C202AD /* Exceptions for "TTS" folder in "Copy Bundle Resources" phase from "TTS" target */,
+				D964FBDC2EA5565F006A2573 /* Exceptions for "TTS" folder in "TTS Prod" target */,
+				D964FEC12EA63CE0006A2573 /* Exceptions for "TTS" folder in "Copy Bundle Resources" phase from "TTS Prod" target */,
+			);
 			path = TTS;
 			sourceTree = "<group>";
 		};
@@ -23,6 +102,21 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D964FBCA2EA5469A006A2573 /* GoogleSignInSwift in Frameworks */,
+				D95125CC2EA52A6600C202AD /* Alamofire in Frameworks */,
+				D964002D2EA80491006A2573 /* Mantis in Frameworks */,
+				D964FBC82EA5469A006A2573 /* GoogleSignIn in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D964FBD22EA5565F006A2573 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D964FBD32EA5565F006A2573 /* GoogleSignInSwift in Frameworks */,
+				D964FBD42EA5565F006A2573 /* Alamofire in Frameworks */,
+				D964002F2EA80497006A2573 /* Mantis in Frameworks */,
+				D964FBD52EA5565F006A2573 /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -33,6 +127,7 @@
 			isa = PBXGroup;
 			children = (
 				D94AF8C02E9146650017C37C /* TTS */,
+				D964FF772EA7F575006A2573 /* Frameworks */,
 				D94AF8BF2E9146650017C37C /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,8 +136,16 @@
 			isa = PBXGroup;
 			children = (
 				D94AF8BE2E9146650017C37C /* TTS.app */,
+				D964FBDB2EA5565F006A2573 /* TTS Prod.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		D964FF772EA7F575006A2573 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -55,6 +158,7 @@
 				D94AF8BA2E9146650017C37C /* Sources */,
 				D94AF8BB2E9146650017C37C /* Frameworks */,
 				D94AF8BC2E9146650017C37C /* Resources */,
+				D95126422EA53E0F00C202AD /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -65,9 +169,40 @@
 			);
 			name = TTS;
 			packageProductDependencies = (
+				D95125CB2EA52A6600C202AD /* Alamofire */,
+				D964FBC72EA5469A006A2573 /* GoogleSignIn */,
+				D964FBC92EA5469A006A2573 /* GoogleSignInSwift */,
+				D964002C2EA80491006A2573 /* Mantis */,
 			);
 			productName = TTS;
 			productReference = D94AF8BE2E9146650017C37C /* TTS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		D964FBCB2EA5565F006A2573 /* TTS Prod */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D964FBD82EA5565F006A2573 /* Build configuration list for PBXNativeTarget "TTS Prod" */;
+			buildPhases = (
+				D964FBD12EA5565F006A2573 /* Sources */,
+				D964FBD22EA5565F006A2573 /* Frameworks */,
+				D964FBD62EA5565F006A2573 /* Resources */,
+				D964FBD72EA5565F006A2573 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				D94AF8C02E9146650017C37C /* TTS */,
+			);
+			name = "TTS Prod";
+			packageProductDependencies = (
+				D964FBCC2EA5565F006A2573 /* Alamofire */,
+				D964FBCE2EA5565F006A2573 /* GoogleSignIn */,
+				D964FBD02EA5565F006A2573 /* GoogleSignInSwift */,
+				D964002E2EA80497006A2573 /* Mantis */,
+			);
+			productName = TTS;
+			productReference = D964FBDB2EA5565F006A2573 /* TTS Prod.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -83,6 +218,9 @@
 					D94AF8BD2E9146650017C37C = {
 						CreatedOnToolsVersion = 26.0.1;
 					};
+					D964FBCB2EA5565F006A2573 = {
+						LastSwiftMigration = 2600;
+					};
 				};
 			};
 			buildConfigurationList = D94AF8B92E9146650017C37C /* Build configuration list for PBXProject "TTS" */;
@@ -94,12 +232,18 @@
 			);
 			mainGroup = D94AF8B52E9146650017C37C;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				D95125CA2EA52A6600C202AD /* XCRemoteSwiftPackageReference "Alamofire" */,
+				D964FBC62EA5469A006A2573 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				D964002B2EA80478006A2573 /* XCRemoteSwiftPackageReference "Mantis" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D94AF8BF2E9146650017C37C /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				D94AF8BD2E9146650017C37C /* TTS */,
+				D964FBCB2EA5565F006A2573 /* TTS Prod */,
 			);
 		};
 /* End PBXProject section */
@@ -112,10 +256,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D964FBD62EA5565F006A2573 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		D94AF8BA2E9146650017C37C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D964FBD12EA5565F006A2573 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -252,10 +410,11 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 5M42R5Z8G5;
+				CURRENT_PROJECT_VERSION = 100102;
+				DEVELOPMENT_TEAM = W49J7LTUV4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TTS/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs access to your camera to take photos.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to your photo library to select images.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -263,12 +422,14 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = tripura.doniel.TTS;
+				MARKETING_VERSION = 1.0.01;
+				"OTHER_SWIFT_FLAGS[arch=*]" = "-DDEVELOPMENT\n-DDEVELOPMENT\n-DDEVELOPMENT";
+				PRODUCT_BUNDLE_IDENTIFIER = com.neuralsound.tts;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -286,10 +447,11 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 5M42R5Z8G5;
+				CURRENT_PROJECT_VERSION = 100102;
+				DEVELOPMENT_TEAM = W49J7LTUV4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TTS/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs access to your camera to take photos.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to your photo library to select images.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -297,12 +459,91 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = tripura.doniel.TTS;
+				MARKETING_VERSION = 1.0.01;
+				"OTHER_SWIFT_FLAGS[arch=*]" = "-DDEVELOPMENT";
+				PRODUCT_BUNDLE_IDENTIFIER = com.neuralsound.tts;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		D964FBD92EA5565F006A2573 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 100102;
+				DEVELOPMENT_TEAM = W49J7LTUV4;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "TTS/TTS-Prod-Info.plist";
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs access to your camera to take photos.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to your photo library to select images.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.01;
+				"OTHER_SWIFT_FLAGS[arch=*]" = "-DPRODUCTION\n-DPRODUCTION";
+				PRODUCT_BUNDLE_IDENTIFIER = com.neuralsound.tts;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D964FBDA2EA5565F006A2573 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 100102;
+				DEVELOPMENT_TEAM = W49J7LTUV4;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "TTS/TTS-Prod-Info.plist";
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs access to your camera to take photos.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to your photo library to select images.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.01;
+				"OTHER_SWIFT_FLAGS[arch=*]" = "-DPRODUCTION";
+				PRODUCT_BUNDLE_IDENTIFIER = com.neuralsound.tts;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -335,7 +576,102 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		D964FBD82EA5565F006A2573 /* Build configuration list for PBXNativeTarget "TTS Prod" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D964FBD92EA5565F006A2573 /* Debug */,
+				D964FBDA2EA5565F006A2573 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		D95125CA2EA52A6600C202AD /* XCRemoteSwiftPackageReference "Alamofire" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Alamofire/Alamofire.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.10.2;
+			};
+		};
+		D964002B2EA80478006A2573 /* XCRemoteSwiftPackageReference "Mantis" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/guoyingtao/Mantis.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.3.0;
+			};
+		};
+		D964FBC62EA5469A006A2573 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.0.0;
+			};
+		};
+		D964FBCD2EA5565F006A2573 /* XCRemoteSwiftPackageReference "Alamofire" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Alamofire/Alamofire.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.10.2;
+			};
+		};
+		D964FBCF2EA5565F006A2573 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D95125CB2EA52A6600C202AD /* Alamofire */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D95125CA2EA52A6600C202AD /* XCRemoteSwiftPackageReference "Alamofire" */;
+			productName = Alamofire;
+		};
+		D964002C2EA80491006A2573 /* Mantis */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D964002B2EA80478006A2573 /* XCRemoteSwiftPackageReference "Mantis" */;
+			productName = Mantis;
+		};
+		D964002E2EA80497006A2573 /* Mantis */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D964002B2EA80478006A2573 /* XCRemoteSwiftPackageReference "Mantis" */;
+			productName = Mantis;
+		};
+		D964FBC72EA5469A006A2573 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D964FBC62EA5469A006A2573 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		D964FBC92EA5469A006A2573 /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D964FBC62EA5469A006A2573 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
+		};
+		D964FBCC2EA5565F006A2573 /* Alamofire */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D964FBCD2EA5565F006A2573 /* XCRemoteSwiftPackageReference "Alamofire" */;
+			productName = Alamofire;
+		};
+		D964FBCE2EA5565F006A2573 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D964FBCF2EA5565F006A2573 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		D964FBD02EA5565F006A2573 /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D964FBCF2EA5565F006A2573 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D94AF8B62E9146650017C37C /* Project object */;
 }
