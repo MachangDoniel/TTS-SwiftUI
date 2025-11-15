@@ -14,116 +14,296 @@ import UIKit
 struct FileViewer: View {
     let fileURL: URL
     @ObservedObject var tts: TTSPlayer
+    @Environment(\.dismiss) private var dismiss
     
+    // Default to read-only mode for text files
+    @State private var extractedText: String = ""
+    @State private var isImage: Bool = false
+    @State private var uiImage: UIImage? = nil
+    @State private var editedText: String = ""
+    @State private var hasUnsavedChanges: Bool = false
+    @State private var isReadOnly: Bool = true
+    @FocusState private var isTextEditorFocused: Bool
+    @State private var backgroundColor: Color = .black
+    
+    @StateObject private var highlightCoordinator = HighlightCoordinator()
+
     init(fileURL: URL, tts: TTSPlayer) {
         self.fileURL = fileURL
         self._tts = ObservedObject(initialValue: tts)
     }
-    
-    @State private var extractedText: String = ""
-    @State private var isImage: Bool = false
-    @State private var uiImage: UIImage? = nil
-    
-    @StateObject private var highlightCoordinator = HighlightCoordinator()
 
     var body: some View {
-        VStack(spacing: 0) {
-            // MARK: - File Content
-            fileContentView
-            
-            // MARK: - Controls
-            TTSControlView(tts: tts, text: extractedText)
-        }
-        .onAppear {
-            // If switching to a different file, stop the old one; otherwise keep speaking
-            if let current = tts.currentURL, current != fileURL {
-                tts.resetSession()
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                // MARK: - Custom Header (fixed at top)
+                FileViewerHeader(
+                    title: fileURL.lastPathComponent,
+                    isEditing: !isReadOnly,
+                    onClose: {
+                        // Dismiss without stopping TTS
+                        dismiss()
+                    },
+                    onTextSettings: {
+                        // Toggle background color to red
+                        backgroundColor = backgroundColor == .black ? .red : .black
+                    },
+                    onEdit: {
+                        // Enable editing for all file types
+                        enableEditing()
+                    },
+                    onSave: {
+                        // Save and exit edit mode
+                        saveFile()
+                        isReadOnly = true
+                    }
+                )
+                .frame(height: 60)
+                
+                // MARK: - File Content (fills middle space)
+                fileContentView
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(backgroundColor)
+                
+                // MARK: - Controls (fixed at bottom)
+                FileViewerTTSControlWrapper(
+                    tts: tts,
+                    text: editedText.isEmpty ? extractedText : editedText,
+                    fileURL: fileURL
+                )
             }
-
-            tts.currentTitle = fileURL.lastPathComponent
-            let ext = fileURL.pathExtension.lowercased()
-
-            switch ext {
-            case "pdf":
-                let text = extractText(from: fileURL)
-                extractedText = text
-                // Prepare only; manual play via controls
-                tts.prepare(text: text, url: fileURL, title: fileURL.lastPathComponent)
-
-            case "txt":
-                loadText() // prepare is gated inside loadText
-
-            default:
-                detectFileType()
-                // For images/others, OCR will trigger prepare if needed
-            }
         }
-        .navigationTitle(fileURL.lastPathComponent)
-        .navigationBarTitleDisplayMode(.inline)
-        .background(Color.black.ignoresSafeArea())
+        .background(backgroundColor.ignoresSafeArea())
         .preferredColorScheme(.dark)
+        .onAppear {
+            handleFileOpening()
+        }
+    }
+    
+    private func handleFileOpening() {
+        // Check TTS state: if stopped (idle/finished), stop it; if playing/paused, let it continue
+        if tts.state == .idle || tts.state == .finished {
+            // Previous TTS is stopped, so stop it to prepare for new file
+            if let current = tts.currentURL, current != fileURL {
+                tts.stop()
+            }
+        }
+        // If playing/paused, let it continue - we'll prepare new file but won't interrupt
+        
+        // Always prepare the new file
+        tts.currentTitle = fileURL.lastPathComponent
+        self.editedText = ""
+        let ext = fileURL.pathExtension.lowercased()
+
+        switch ext {
+        case "pdf":
+            let text = extractText(from: fileURL)
+            extractedText = text
+            editedText = text
+            // Prepare the new file
+            tts.prepare(text: text, url: fileURL, title: fileURL.lastPathComponent)
+
+        case "txt":
+            loadText() // prepare is gated inside loadText
+            self.isReadOnly = true
+            
+        default:
+            detectFileType()
+            // For images/others, OCR will trigger prepare if needed
+        }
+        
+        // Monitor TTS state changes to ensure new file plays when user clicks play
+        // If user clicks play and currentURL matches fileURL but TTS is playing old file, stop and start new
+        observeTTSState()
+    }
+    
+    private func observeTTSState() {
+        // This is handled by FileViewerTTSControlWrapper
     }
     
     private var fileContentView: some View {
-        Group {
-            if fileURL.pathExtension.lowercased() == "pdf" {
-                PDFKitView(url: fileURL, tts: tts)
-                    .onAppear {
-                        if let doc = PDFDocument(url: fileURL) {
-                            highlightCoordinator.setDocument(.pdf(document: doc))
+        ZStack {
+            // Black background fills the space
+            backgroundColor
+            
+            Group {
+                if isReadOnly {
+                    // Read-only view
+                    if fileURL.pathExtension.lowercased() == "pdf" {
+                        PDFKitView(url: fileURL, tts: tts)
+                            .onAppear {
+                                if let doc = PDFDocument(url: fileURL) {
+                                    highlightCoordinator.setDocument(.pdf(document: doc))
+                                }
+                            }
+                    } else if ["png", "jpg", "jpeg", "heic"].contains(fileURL.pathExtension.lowercased()) {
+                        Group {
+                            if let img = uiImage {
+                                Image(uiImage: img)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .onAppear { performOCRIfNeeded() }
+                            } else {
+                                ProgressView("Loading image...")
+                                    .foregroundColor(.white)
+                                    .onAppear { loadImage() }
+                            }
                         }
-                    }
-            } else if ["png", "jpg", "jpeg", "heic"].contains(fileURL.pathExtension.lowercased()) {
-                Group {
-                    if let img = uiImage {
-                        Image(uiImage: img)
-                            .resizable()
-                            .scaledToFit()
-                            .background(Color.black)
-                            .onAppear { performOCRIfNeeded() }
+                    } else if fileURL.pathExtension.lowercased() == "txt" {
+                        ReadOnlyAccurateHighlight(fullText: editedText.isEmpty ? extractedText : editedText, tts: tts)
                     } else {
-                        ProgressView("Loading image...")
-                            .onAppear { loadImage() }
+                        Text("Unsupported file type")
+                            .foregroundColor(.gray)
+                            .padding()
                     }
+                } else {
+                    // Editable view - show text editor for all file types
+                    TextEditor(text: $editedText)
+                        .focused($isTextEditorFocused)
+                        .padding()
+                        .background(backgroundColor)
+                        .foregroundColor(.white)
+                        .font(.system(size: 18))
+                        .onChange(of: editedText) { newValue in
+                            hasUnsavedChanges = (newValue != extractedText)
+                        }
+                        .onAppear { 
+                            isTextEditorFocused = true
+                            // Initialize editedText if empty
+                            if editedText.isEmpty && !extractedText.isEmpty {
+                                editedText = extractedText
+                            }
+                        }
                 }
-            } else if fileURL.pathExtension.lowercased() == "txt" {
-                textContentView
-            } else {
-                Text("Unsupported file type")
-                    .foregroundColor(.gray)
-                    .padding()
             }
         }
     }
+}
+
+// MARK: - TTS Control Wrapper
+struct FileViewerTTSControlWrapper: View {
+    @ObservedObject var tts: TTSPlayer
+    let text: String
+    let fileURL: URL
     
-    private var textContentView: some View {
-        ScrollView {
-            if tts.sentences.isEmpty {
-                Text(extractedText.isEmpty ? "Loading..." : extractedText)
-                    .font(.system(size: 18))
-                    .foregroundColor(.white.opacity(0.8))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
-            } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(Array(tts.sentences.enumerated()), id: \.offset) { index, sentence in
-                        SentenceRow(
-                            index: index,
-                            sentence: sentence,
-                            isActive: index == tts.currentIndex,
-                            currentWordRange: index == tts.currentIndex ? tts.currentWordRange : nil,
-                            currentWordIndex: tts.currentWordIndexInSentence ?? 0,
-                            position: tts.position,
-                            coordinator: highlightCoordinator
-                        )
+    var body: some View {
+        TTSControlView(tts: tts, text: text)
+            .onChange(of: tts.state) { newState in
+                // When state changes to playing, ensure it's playing the correct file
+                if newState == .playing {
+                    // If currentURL matches fileURL, we're good
+                    // If not, we need to stop and prepare the new file
+                    if let current = tts.currentURL, current != fileURL {
+                        // This shouldn't happen since we prepare in onAppear,
+                        // but just in case, stop and prepare the new file
+                        tts.stop()
+                        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            tts.prepare(text: text, url: fileURL, title: fileURL.lastPathComponent)
+                            tts.playFromCurrent()
+                        }
                     }
                 }
-                .padding()
+            }
+    }
+}
+
+extension FileViewer {
+    // MARK: - Editing Functions
+    
+    private func enableEditing() {
+        // For PDFs and images, ensure we have extracted text
+        let ext = fileURL.pathExtension.lowercased()
+        if ext == "pdf" {
+            if extractedText.isEmpty {
+                let text = extractText(from: fileURL)
+                extractedText = text
+                editedText = text
+            }
+        } else if ["png", "jpg", "jpeg", "heic"].contains(ext) {
+            // For images, use OCR text if available
+            if extractedText.isEmpty && uiImage != nil {
+                performOCRIfNeeded()
+            }
+            // Wait a bit for OCR if needed, or use existing extractedText
+            if editedText.isEmpty && !extractedText.isEmpty {
+                editedText = extractedText
+            }
+        } else if ext == "txt" {
+            // For text files, ensure editedText is set
+            if editedText.isEmpty && !extractedText.isEmpty {
+                editedText = extractedText
             }
         }
-        .background(Color.black)
-        .onAppear {
-            highlightCoordinator.setDocument(.plainText(text: extractedText))
+        
+        isReadOnly = false
+        isTextEditorFocused = true
+    }
+    
+    private func saveFile() {
+        let ext = fileURL.pathExtension.lowercased()
+        
+        if ext == "txt" {
+            saveTextToFile()
+        } else if ext == "pdf" {
+            // For PDFs, save as text file (since we can't edit PDF structure)
+            savePDFAsText()
+        } else if ["png", "jpg", "jpeg", "heic"].contains(ext) {
+            // For images, save OCR text as text file
+            saveImageTextAsFile()
+        } else {
+            // For other types, try to save as text
+            saveTextToFile()
+        }
+    }
+    
+    private func savePDFAsText() {
+        let trimmed = editedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        
+        let fm = FileManager.default
+        let docsURL = fm.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let name = fileURL.deletingPathExtension().lastPathComponent + ".txt"
+        let destinationURL = docsURL.appendingPathComponent(name)
+        
+        do {
+            try trimmed.write(to: destinationURL, atomically: true, encoding: .utf8)
+            hasUnsavedChanges = false
+            extractedText = trimmed
+            editedText = trimmed
+            
+            tts.prepare(text: trimmed, url: destinationURL, title: destinationURL.lastPathComponent)
+            tts.currentURL = destinationURL
+            highlightCoordinator.setDocument(.plainText(text: trimmed))
+            
+            Logger.log("✅ Saved PDF text to file: \(destinationURL.lastPathComponent)")
+        } catch {
+            Logger.log("❌ Save failed: \(error.localizedDescription)")
+        }
+    }
+    
+    private func saveImageTextAsFile() {
+        let trimmed = editedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        
+        let fm = FileManager.default
+        let docsURL = fm.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let name = fileURL.deletingPathExtension().lastPathComponent + ".txt"
+        let destinationURL = docsURL.appendingPathComponent(name)
+        
+        do {
+            try trimmed.write(to: destinationURL, atomically: true, encoding: .utf8)
+            hasUnsavedChanges = false
+            extractedText = trimmed
+            editedText = trimmed
+            
+            tts.prepare(text: trimmed, url: destinationURL, title: destinationURL.lastPathComponent)
+            tts.currentURL = destinationURL
+            highlightCoordinator.setDocument(.plainText(text: trimmed))
+            
+            Logger.log("✅ Saved image text to file: \(destinationURL.lastPathComponent)")
+        } catch {
+            Logger.log("❌ Save failed: \(error.localizedDescription)")
         }
     }
     
@@ -147,19 +327,74 @@ struct FileViewer: View {
                let content = String(data: data, encoding: .utf8) {
                 DispatchQueue.main.async {
                     self.extractedText = content
+                    self.editedText = content
+                    self.hasUnsavedChanges = false
+                    self.isReadOnly = true  // Start in read-only mode
                     if self.tts.currentURL != self.fileURL || self.tts.sentences.isEmpty {
                         self.tts.prepare(
                             text: content,
                             url: self.fileURL,
                             title: self.fileURL.lastPathComponent
                         )
+                        self.tts.currentURL = self.fileURL
                     }
                 }
             } else {
                 DispatchQueue.main.async {
                     self.extractedText = "⚠️ Unable to load text."
+                    self.editedText = "⚠️ Unable to load text."
                 }
             }
+        }
+    }
+    
+    private func saveTextToFile() {
+        let trimmed = editedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        // Determine a writable destination URL. Prefer the existing fileURL if it's in Documents and writable.
+        let fm = FileManager.default
+        let docsURL = fm.urls(for: .documentDirectory, in: .userDomainMask).first!
+
+        var destinationURL = fileURL
+        // If the current URL is not in Documents, redirect to Documents with same lastPathComponent
+        if !destinationURL.path.hasPrefix(docsURL.path) {
+            destinationURL = docsURL.appendingPathComponent(fileURL.lastPathComponent)
+        }
+
+        // Ensure .txt extension
+        if destinationURL.pathExtension.lowercased() != "txt" {
+            destinationURL.deletePathExtension()
+            destinationURL.appendPathExtension("txt")
+        }
+
+        do {
+            // Create file if it doesn't exist
+            if !fm.fileExists(atPath: destinationURL.path) {
+                let created = fm.createFile(atPath: destinationURL.path, contents: nil, attributes: nil)
+                if !created {
+                    throw NSError(domain: "FileViewer", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unable to create file at destination."])
+                }
+            }
+            // Write contents
+            try trimmed.write(to: destinationURL, atomically: true, encoding: .utf8)
+
+            // Update state to reflect saved file and new URL
+            hasUnsavedChanges = false
+            extractedText = trimmed
+            editedText = trimmed
+
+            // Prepare TTS with the saved text
+            tts.prepare(text: trimmed, url: destinationURL, title: destinationURL.lastPathComponent)
+            tts.currentURL = destinationURL
+
+            // Convert to read-only mode and update highlights
+            isReadOnly = true
+            highlightCoordinator.setDocument(.plainText(text: trimmed))
+
+            Logger.log("✅ Saved text to file: \(destinationURL.lastPathComponent)")
+        } catch {
+            Logger.log("❌ Save failed: \(error.localizedDescription)")
         }
     }
     
@@ -199,6 +434,7 @@ struct FileViewer: View {
             let text = lines.joined(separator: "\n")
             DispatchQueue.main.async {
                 self.extractedText = text.isEmpty ? "No text detected." : text
+                self.editedText = self.extractedText // Initialize editedText for editing
                 if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     self.tts.prepare(
                         text: text,
@@ -228,116 +464,3 @@ struct FileViewer: View {
     }
 }
 
-private struct SentenceRow: View {
-    let index: Int
-    let sentence: String
-    let isActive: Bool
-    let currentWordRange: NSRange?
-    let currentWordIndex: Int
-    let position: TTSPlayer.TTSPosition
-    @ObservedObject var coordinator: HighlightCoordinator
-    
-    private var positionToken: String { String(describing: position) }
-
-    var body: some View {
-        SentenceLineView(
-            sentence: sentence,
-            isActive: isActive,
-            wordRange: currentWordRange
-        )
-        .background(
-            GeometryReader { geo in
-                Color.clear
-                    .onChange(of: positionToken) { _ in
-                        guard isActive else { return }
-                        let span = SentenceSpan(index: index, text: sentence, nsRange: nil)
-                        let wspan = currentWordRange.map { WordSpan(nsRange: $0, tokenIndex: currentWordIndex) }
-                        coordinator.updateHighlight(sentence: span, word: wspan, containerSize: geo.size)
-                    }
-            }
-        )
-    }
-}
-
-// MARK: - Highlight View for Sentences
-
-struct SentenceLineView: View {
-    let sentence: String
-    let isActive: Bool
-    let wordRange: NSRange?
-
-    @State private var wordFrame: CGRect = .zero
-    @State private var shouldAnimate = false
-
-    var body: some View {
-        ZStack(alignment: .leading) {
-            // Base text
-            Text(sentence)
-                .font(.system(size: 18))
-                .foregroundColor(isActive ? .white : .white.opacity(0.7))
-                .background(
-                    GeometryReader { geo in
-                        Color.clear.preference(
-                            key: WordFramePreferenceKey.self,
-                            value: calculateWordFrame(in: geo.size)
-                        )
-                    }
-                )
-
-            // Blue overlay (precise highlight)
-            if isActive && wordFrame != .zero {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.blue.opacity(0.7))
-                    .frame(width: wordFrame.width, height: wordFrame.height)
-                    .offset(x: wordFrame.minX, y: wordFrame.minY)
-                    .animation(.easeInOut(duration: 0.12), value: wordFrame)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .onPreferenceChange(WordFramePreferenceKey.self) { newFrame in
-            // Safely update state outside render phase
-            DispatchQueue.main.async {
-                if newFrame != self.wordFrame {
-                    self.wordFrame = newFrame
-                }
-            }
-        }
-    }
-
-    // MARK: - Calculate Highlight Frame
-    private func calculateWordFrame(in size: CGSize) -> CGRect {
-        guard isActive,
-              let range = wordRange,
-              let swiftRange = Range(range, in: sentence) else {
-            return .zero
-        }
-
-        // Use UILabel to measure the exact range of the word
-        let label = UILabel()
-        label.font = UIFont.systemFont(ofSize: 18)
-        label.text = sentence
-        label.numberOfLines = 0
-        label.lineBreakMode = .byWordWrapping
-        label.frame = CGRect(origin: .zero, size: size)
-
-        let font = label.font ?? UIFont.systemFont(ofSize: 18)
-        let textStorage = NSTextStorage(string: sentence, attributes: [.font: font])
-        let layoutManager = NSLayoutManager()
-        let textContainer = NSTextContainer(size: size)
-        textContainer.lineFragmentPadding = 0
-        textContainer.maximumNumberOfLines = 0
-        layoutManager.addTextContainer(textContainer)
-        textStorage.addLayoutManager(layoutManager)
-
-        let nsRange = NSRange(swiftRange, in: sentence)
-        return layoutManager.boundingRect(forGlyphRange: nsRange, in: textContainer)
-    }
-}
-
-// MARK: - Preference Key
-private struct WordFramePreferenceKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        value = nextValue()
-    }
-}

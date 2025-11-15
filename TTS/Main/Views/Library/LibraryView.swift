@@ -7,10 +7,16 @@
 
 import SwiftUI
 
+private struct LibraryDocumentItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
 struct LibraryView: View {
     @EnvironmentObject private var recentStore: RecentStore
     @State private var selectedFilter: FileCategory = .all
     @State private var selectedDocumentURL: URL? = nil
+    @State private var selectedDocumentItem: LibraryDocumentItem? = nil
     @EnvironmentObject private var tts: TTSPlayer
 
     private let timeFormatter: DateFormatter = {
@@ -44,7 +50,7 @@ struct LibraryView: View {
                                         .padding(.top, 12)
 
                                     VStack(spacing: 12) {
-                                        ForEach(filteredItems) { item in
+                                        ForEach(filteredItems, id: \.id) { item in
                                             Button {
                                                 // Resolve via bookmark first if present
                                                 var opened = false
@@ -52,11 +58,9 @@ struct LibraryView: View {
                                                     var isStale = false
                                                     if let resolved = try? URL(resolvingBookmarkData: bm, options: [], relativeTo: nil, bookmarkDataIsStale: &isStale) {
                                                         if resolved.startAccessingSecurityScopedResource() {
-                                                            // Stop any ongoing TTS to ensure clean refresh
-                                                            if tts.currentURL != resolved {
-                                                                tts.stop()
-                                                            }
+                                                            // Don't stop TTS - let it continue if same file
                                                             selectedDocumentURL = resolved
+                                                            selectedDocumentItem = LibraryDocumentItem(url: resolved)
                                                             opened = true
                                                             // keep access while viewing; we'll stop on navigate back
                                                         }
@@ -64,10 +68,9 @@ struct LibraryView: View {
                                                 }
                                                 if !opened {
                                                     if let url = item.resolvedURL, url.isFileURL, FileManager.default.fileExists(atPath: url.path) {
-                                                        if tts.currentURL != url {
-                                                            tts.stop()
-                                                        }
+                                                        // Don't stop TTS - let it continue if same file
                                                         selectedDocumentURL = url
+                                                        selectedDocumentItem = LibraryDocumentItem(url: url)
                                                         opened = true
                                                     } else {
                                                         // TODO: handle links/text or show message
@@ -102,17 +105,8 @@ struct LibraryView: View {
                 }
                 .padding(.horizontal, 16)
             }
-            .navigationDestination(isPresented: Binding(
-                get: { selectedDocumentURL != nil },
-                set: { if !$0 { selectedDocumentURL = nil } }
-            )) {
-                if let url = selectedDocumentURL {
-                    FileViewer(fileURL: url, tts: tts)
-                        .navigationTitle(url.lastPathComponent)
-                        .navigationBarTitleDisplayMode(.inline)
-                } else {
-                    EmptyView()
-                }
+            .fullScreenCover(item: $selectedDocumentItem) { item in
+                FileViewer(fileURL: item.url, tts: tts)
             }
         }
     }

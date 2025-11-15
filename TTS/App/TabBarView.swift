@@ -21,6 +21,7 @@ struct TabBarView: View {
     @State private var showPhotoReader = false
     
     @State private var selectedDocumentURL: URL?
+    @State private var selectedDocumentItem: IdentifiableURL? = nil
     @State private var webLinkItem: IdentifiableURL? = nil
     @State private var extractedTextFromWeb: String? = nil
     @State private var showLinkInput = false
@@ -63,9 +64,13 @@ struct TabBarView: View {
                                 do {
                                     let resolved = try URL(resolvingBookmarkData: bm, options: [], relativeTo: nil, bookmarkDataIsStale: &isStale)
                                     if resolved.startAccessingSecurityScopedResource() {
-                                        // Stop any ongoing TTS to ensure clean refresh
-//                                        tts.stop()
+                                        // Check TTS state: if stopped (idle/finished), stop it; if playing/paused, let it continue
+                                        if tts.state == .idle || tts.state == .finished {
+                                            tts.stop()
+                                        }
+                                        // If playing/paused, let it continue - FileViewer will handle preparation
                                         selectedDocumentURL = resolved
+                                        selectedDocumentItem = IdentifiableURL(url: resolved)
                                         opened = true
                                         // Note: do not stopAccessing here; keep access while viewing
                                     }
@@ -75,9 +80,13 @@ struct TabBarView: View {
                             }
                             if !opened {
                                 if FileManager.default.fileExists(atPath: url.path) {
-                                    // Stop any ongoing TTS to ensure clean refresh
-                                    tts.stop()
+                                    // Check TTS state: if stopped (idle/finished), stop it; if playing/paused, let it continue
+                                    if tts.state == .idle || tts.state == .finished {
+                                        tts.stop()
+                                    }
+                                    // If playing/paused, let it continue - FileViewer will handle preparation
                                     selectedDocumentURL = url
+                                    selectedDocumentItem = IdentifiableURL(url: url)
                                     opened = true
                                 } else {
                                     Logger.log("Recent file missing at path: \(sp)")
@@ -130,9 +139,13 @@ struct TabBarView: View {
                     }
                     // Navigate to the picked file immediately if available
                     if let u = resolvedURL {
-                        // Stop any ongoing TTS and reset state before opening a new file
-                        tts.stop()
+                        // Check TTS state: if stopped (idle/finished), stop it; if playing/paused, let it continue
+                        if tts.state == .idle || tts.state == .finished {
+                            tts.stop()
+                        }
+                        // If playing/paused, let it continue - FileViewer will handle preparation
                         selectedDocumentURL = u
+                        selectedDocumentItem = IdentifiableURL(url: u)
                     }
                 }
             }
@@ -150,10 +163,14 @@ struct TabBarView: View {
                         // Fallback: still add without bookmark if it failed
                         recentStore.addExternal(fileURL: url, bookmarkData: Data(), kind: .files)
                     }
-                    // Stop any ongoing speech and open the new text file
-                    tts.stop()
+                    // Check TTS state: if stopped (idle/finished), stop it; if playing/paused, let it continue
+                    if tts.state == .idle || tts.state == .finished {
+                        tts.stop()
+                    }
+                    // If playing/paused, let it continue - FileViewer will handle preparation
                     selectedTab = 0
                     selectedDocumentURL = url
+                    selectedDocumentItem = IdentifiableURL(url: url)
                 }
             }
             .sheet(isPresented: $showCameraReader) {
@@ -200,18 +217,9 @@ struct TabBarView: View {
                 }
             }
             
-            // Navigation to FileViewer when a document is picked
-            .navigationDestination(isPresented: Binding(
-                get: { selectedDocumentURL != nil },
-                set: { if !$0 { selectedDocumentURL = nil } }
-            )) {
-                if let url = selectedDocumentURL {
-                    AccessingFileViewer(url: url, tts: tts)
-                        .navigationTitle(url.lastPathComponent)
-                        .navigationBarTitleDisplayMode(.inline)
-                } else {
-                    EmptyView()
-                }
+            // Present FileViewer as fullScreenCover when a document is picked
+            .fullScreenCover(item: $selectedDocumentItem) { item in
+                AccessingFileViewer(url: item.url, tts: tts)
             }
             .overlay(alignment: .bottom) {
                 if tts.hasActiveItem {
@@ -219,10 +227,12 @@ struct TabBarView: View {
                         if let url = tts.currentURL {
                             selectedTab = 0
                             selectedDocumentURL = url
+                            selectedDocumentItem = IdentifiableURL(url: url)
                         } else if let url = selectedDocumentURL {
                             // Fallback: navigate to the last selected document
                             selectedTab = 0
                             selectedDocumentURL = url
+                            selectedDocumentItem = IdentifiableURL(url: url)
                         } else {
                             Logger.log("Nothing to play or open")
                             // Optional: show a message to the user

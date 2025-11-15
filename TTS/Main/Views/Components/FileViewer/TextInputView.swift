@@ -15,45 +15,62 @@ struct TextInputView: View {
     var onSaved: ((URL) -> Void)? = nil
 
     @State private var inputText = ""
+    @State private var isReadOnly: Bool = false
     @FocusState private var focused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
 
-            // MARK: - Top Bar
-            HStack {
-                Button("Cancel") {
-                    cancelAndDismiss()
-                }
-                .foregroundColor(.white)
-
-                Spacer()
-
-                Button("Save File") {
-                    saveTextToFile()
-                }
-                .foregroundColor(.blue)
-            }
-            .padding()
-            .background(Color.black)
-
-            // MARK: - Editable area
-            ZStack(alignment: .topLeading) {
-                if inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Text("Write anything")
-                        .foregroundColor(.gray)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 14)
-                        .zIndex(1)
-                }
-
-                TextEditor(text: $inputText)
-                    .focused($focused)
-                    .scrollContentBackground(.hidden)
+            // MARK: - Top Bar (only show in editable mode)
+            if !isReadOnly {
+                HStack {
+                    Button("Cancel") {
+                        cancelAndDismiss()
+                    }
                     .foregroundColor(.white)
-                    .font(.system(size: 18))
-                    .padding(.horizontal, 10)
-                    .background(Color.black)
+
+                    Spacer()
+
+                    Button("Save File") {
+                        saveAndConvertToReadOnly()
+                    }
+                    .foregroundColor(.blue)
+                }
+                .padding()
+                .background(Color.black)
+            }
+
+            // MARK: - Content Area
+            if isReadOnly {
+                // Read-only mode: Show accurate word + sentence highlighting
+                ReadOnlyAccurateHighlight(fullText: inputText, tts: tts)
+            } else {
+                // Editable mode: Show TextEditor with sentence-only highlighting
+                ZStack(alignment: .topLeading) {
+                    if inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text("Write anything")
+                            .foregroundColor(.gray)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 14)
+                            .zIndex(1)
+                    }
+
+                    TextEditor(text: $inputText)
+                        .focused($focused)
+                        .scrollContentBackground(.hidden)
+                        .foregroundColor(.white)
+                        .font(.system(size: 18))
+                        .padding(.horizontal, 10)
+                        .background(Color.black)
+                    
+                    // Sentence highlighting overlay (only when playing)
+                    if !tts.sentences.isEmpty && tts.isSpeaking && !inputText.isEmpty {
+                        EditableSentenceHighlight(fullText: inputText, tts: tts)
+                            .allowsHitTesting(false)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                    }
+                }
             }
 
             // MARK: - TTS Controls
@@ -82,6 +99,18 @@ struct TextInputView: View {
     }
 
     // MARK: - Save Handler
+    private func saveAndConvertToReadOnly() {
+        let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        // Prepare TTS with the text
+        tts.prepare(text: trimmed, url: nil, title: nil)
+        
+        // Convert to read-only mode
+        isReadOnly = true
+        saveTextToFile()
+    }
+    
     private func saveTextToFile() {
         let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -112,51 +141,6 @@ struct TextInputView: View {
     }
 }
 
-// MARK: - Read-only Highlighted Text
-struct ReadOnlyHighlightedText: View {
-    let text: String
-    @ObservedObject var tts: TTSPlayer
-
-    var body: some View {
-        ScrollView {
-            Text(makeHighlightedAttributedString())
-                .font(.system(size: 18))
-                .foregroundColor(.white)
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .background(Color.black)
-    }
-
-    private func makeHighlightedAttributedString() -> AttributedString {
-        var attr = AttributedString(text)
-
-        guard tts.isSpeaking,
-              let sentenceRange = (text as NSString).range(of: tts.currentSentenceText).toRange(),
-              let wordRange = tts.currentWordRange
-        else { return attr }
-
-        let globalStart = sentenceRange.lowerBound + wordRange.location
-        let globalEnd = min(globalStart + wordRange.length, text.count)
-        guard globalStart < globalEnd else { return attr }
-
-        let charStart = attr.characters.index(attr.characters.startIndex, offsetBy: globalStart)
-        let charEnd = attr.characters.index(attr.characters.startIndex, offsetBy: globalEnd)
-        let highlightRange = charStart..<charEnd
-
-        attr[highlightRange].backgroundColor = .blue
-        attr[highlightRange].foregroundColor = .black
-        attr[highlightRange].font = .system(size: 18)
-        return attr
-    }
-}
-
-private extension NSRange {
-    func toRange() -> Range<Int>? {
-        guard location != NSNotFound else { return nil }
-        return location ..< location + length
-    }
-}
 
 #Preview {
     TextInputView(tts: TTSPlayer(), prefilledText: "Example prefilled text from a link...")

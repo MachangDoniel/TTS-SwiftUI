@@ -30,7 +30,7 @@ struct HeaderSlide: View {
             HStack {
                 // Left side: text + button
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Listen with the most advanced\nAI Voices uh")
+                    Text("Listen with the most advanced\nAI Voices")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.white)
                         .fixedSize(horizontal: false, vertical: true)
