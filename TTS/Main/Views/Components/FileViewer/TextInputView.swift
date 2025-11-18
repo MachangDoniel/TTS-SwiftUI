@@ -85,9 +85,14 @@ struct TextInputView: View {
             if let prefilled = prefilledText, inputText.isEmpty {
                 inputText = prefilled
                 tts.stop()
-//                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-//                    tts.startReading(prefilled)
-//                }
+                tts.prepareNewFileOnly(text: prefilled, url: nil, title: "Unsaved Text")
+            }
+        }
+        .onChange(of: inputText) { newValue in
+            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Prepare only when there's some content; keep paused
+            if !trimmed.isEmpty {
+                tts.prepareNewFileOnly(text: trimmed, url: nil, title: "Unsaved Text")
             }
         }
     }
@@ -104,7 +109,7 @@ struct TextInputView: View {
         guard !trimmed.isEmpty else { return }
 
         // Prepare TTS with the text
-        tts.prepare(text: trimmed, url: nil, title: nil)
+        tts.prepareNewFileOnly(text: trimmed, url: nil, title: nil)
         
         // Convert to read-only mode
         isReadOnly = true

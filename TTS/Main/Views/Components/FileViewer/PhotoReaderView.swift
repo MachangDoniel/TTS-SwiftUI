@@ -136,11 +136,7 @@ struct PhotoReaderView: View {
                     recognizedText = combined
                     wordBoxes = boxes
 
-                    tts.stop()
-                    tts.startReading(
-                        combined,
-                        title: tts.currentTitle ?? "Photo Reader"
-                    )
+                    tts.prepareNewFileOnly(text: combined, url: tts.currentURL, title: tts.currentTitle ?? "Photo Reader")
                 }
             }
 

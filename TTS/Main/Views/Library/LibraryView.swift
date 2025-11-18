@@ -52,30 +52,21 @@ struct LibraryView: View {
                                     VStack(spacing: 12) {
                                         ForEach(filteredItems, id: \.id) { item in
                                             Button {
-                                                // Resolve via bookmark first if present
                                                 var opened = false
                                                 if let bm = item.bookmarkData {
                                                     var isStale = false
-                                                    if let resolved = try? URL(resolvingBookmarkData: bm, options: [], relativeTo: nil, bookmarkDataIsStale: &isStale) {
-                                                        if resolved.startAccessingSecurityScopedResource() {
-                                                            // Don't stop TTS - let it continue if same file
-                                                            selectedDocumentURL = resolved
-                                                            selectedDocumentItem = LibraryDocumentItem(url: resolved)
-                                                            opened = true
-                                                            // keep access while viewing; we'll stop on navigate back
-                                                        }
+                                                    if let resolved = try? URL(resolvingBookmarkData: bm, options: [], relativeTo: nil, bookmarkDataIsStale: &isStale),
+                                                       resolved.startAccessingSecurityScopedResource() {
+                                                        openRecentItem(url: resolved)
+                                                        opened = true
                                                     }
                                                 }
+                                                if !opened, let url = item.resolvedURL, url.isFileURL, FileManager.default.fileExists(atPath: url.path) {
+                                                    openRecentItem(url: url)
+                                                    opened = true
+                                                }
                                                 if !opened {
-                                                    if let url = item.resolvedURL, url.isFileURL, FileManager.default.fileExists(atPath: url.path) {
-                                                        // Don't stop TTS - let it continue if same file
-                                                        selectedDocumentURL = url
-                                                        selectedDocumentItem = LibraryDocumentItem(url: url)
-                                                        opened = true
-                                                    } else {
-                                                        // TODO: handle links/text or show message
-                                                        Logger.log("Unable to resolve local file for: \(item.title)")
-                                                    }
+                                                    Logger.log("Unable to resolve local file for: \(item.title)")
                                                 }
                                             } label: {
                                                 RecentRow(item: item, timeFormatter: timeFormatter)
@@ -109,6 +100,17 @@ struct LibraryView: View {
                 FileViewer(fileURL: item.url, tts: tts)
             }
         }
+    }
+
+    // Unified open flow for recent items: stop previous TTS, prepare new file (paused), present viewer
+    private func openRecentItem(url: URL) {
+        // 1) Stop any previous TTS session right away
+        tts.stop()
+        // 2) Restart TTS for this new file and pause (no auto-start)
+        tts.prepareNewFileOnly(text: "", url: url, title: url.lastPathComponent)
+        // 3) Present FileViewer
+        selectedDocumentURL = url
+        selectedDocumentItem = LibraryDocumentItem(url: url)
     }
 
     // Filter logic based on FileCategory and item kind

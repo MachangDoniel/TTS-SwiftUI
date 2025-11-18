@@ -100,8 +100,8 @@ struct FileViewer: View {
             let text = extractText(from: fileURL)
             extractedText = text
             editedText = text
-            // Prepare the new file
-            tts.prepare(text: text, url: fileURL, title: fileURL.lastPathComponent)
+            // Prepare the new file (no auto-start)
+            tts.prepareNewFileOnly(text: text, url: fileURL, title: fileURL.lastPathComponent)
 
         case "txt":
             loadText() // prepare is gated inside loadText
@@ -199,8 +199,7 @@ struct FileViewerTTSControlWrapper: View {
                         // but just in case, stop and prepare the new file
                         tts.stop()
                         if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            tts.prepare(text: text, url: fileURL, title: fileURL.lastPathComponent)
-                            tts.playFromCurrent()
+                            tts.prepareNewFileOnly(text: text, url: fileURL, title: fileURL.lastPathComponent)
                         }
                     }
                 }
@@ -272,7 +271,7 @@ extension FileViewer {
             extractedText = trimmed
             editedText = trimmed
             
-            tts.prepare(text: trimmed, url: destinationURL, title: destinationURL.lastPathComponent)
+            tts.prepareNewFileOnly(text: trimmed, url: destinationURL, title: destinationURL.lastPathComponent)
             tts.currentURL = destinationURL
             highlightCoordinator.setDocument(.plainText(text: trimmed))
             
@@ -297,7 +296,7 @@ extension FileViewer {
             extractedText = trimmed
             editedText = trimmed
             
-            tts.prepare(text: trimmed, url: destinationURL, title: destinationURL.lastPathComponent)
+            tts.prepareNewFileOnly(text: trimmed, url: destinationURL, title: destinationURL.lastPathComponent)
             tts.currentURL = destinationURL
             highlightCoordinator.setDocument(.plainText(text: trimmed))
             
@@ -331,7 +330,7 @@ extension FileViewer {
                     self.hasUnsavedChanges = false
                     self.isReadOnly = true  // Start in read-only mode
                     if self.tts.currentURL != self.fileURL || self.tts.sentences.isEmpty {
-                        self.tts.prepare(
+                        self.tts.prepareNewFileOnly(
                             text: content,
                             url: self.fileURL,
                             title: self.fileURL.lastPathComponent
@@ -385,7 +384,7 @@ extension FileViewer {
             editedText = trimmed
 
             // Prepare TTS with the saved text
-            tts.prepare(text: trimmed, url: destinationURL, title: destinationURL.lastPathComponent)
+            tts.prepareNewFileOnly(text: trimmed, url: destinationURL, title: destinationURL.lastPathComponent)
             tts.currentURL = destinationURL
 
             // Convert to read-only mode and update highlights
@@ -436,7 +435,7 @@ extension FileViewer {
                 self.extractedText = text.isEmpty ? "No text detected." : text
                 self.editedText = self.extractedText // Initialize editedText for editing
                 if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    self.tts.prepare(
+                    self.tts.prepareNewFileOnly(
                         text: text,
                         url: self.fileURL,
                         title: self.fileURL.lastPathComponent

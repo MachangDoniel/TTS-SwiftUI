@@ -22,6 +22,7 @@ struct HomeView: View {
     var onOpenRecent: ((RecentActivity) -> Void)?
     
     @EnvironmentObject private var recentStore: RecentStore
+    @EnvironmentObject private var tts: TTSPlayer
     
     @State private var renamingItem: RecentActivity? = nil
     @State private var newTitle: String = ""
@@ -134,7 +135,7 @@ struct HomeView: View {
             } else {
                 VStack(spacing: 14) {
                     ForEach(recentStore.items) { item in
-                        Button(action: { onOpenRecent?(item) }) {
+                        Button(action: { openRecentItem(item) }) {
                             RecentRow(item: item, timeFormatter: timeFormatter)
                         }
                         .padding(.horizontal, 20)
@@ -160,6 +161,30 @@ struct HomeView: View {
         .background(Color(red: 0.10, green: 0.10, blue: 0.11))
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .padding(.horizontal, 16)
+    }
+    
+    // Unified open flow for recent items: stop previous TTS, prepare new file (paused), then delegate navigation
+    private func openRecentItem(_ item: RecentActivity) {
+        // Resolve URL if possible
+        if let url = item.resolvedURL, url.isFileURL, FileManager.default.fileExists(atPath: url.path) {
+            // Stop previous and prepare new file paused
+            tts.stop()
+            tts.prepareNewFileOnly(text: "", url: url, title: url.lastPathComponent)
+            // Delegate navigation to the parent via callback (keeps routing consistent)
+            onOpenRecent?(item)
+        } else if let bm = item.bookmarkData {
+            var isStale = false
+            if let resolved = try? URL(resolvingBookmarkData: bm, options: [], relativeTo: nil, bookmarkDataIsStale: &isStale),
+               resolved.startAccessingSecurityScopedResource() {
+                tts.stop()
+                tts.prepareNewFileOnly(text: "", url: resolved, title: resolved.lastPathComponent)
+                onOpenRecent?(item)
+            } else {
+                onOpenRecent?(item) // fallback: let parent handle if not resolvable
+            }
+        } else {
+            onOpenRecent?(item)
+        }
     }
 }
 

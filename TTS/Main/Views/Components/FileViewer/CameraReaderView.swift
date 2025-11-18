@@ -136,11 +136,7 @@ struct CameraReaderView: View {
                     recognizedText = combined
                     wordBoxes = boxes
 
-                    tts.stop()
-                    tts.startReading(
-                        combined,
-                        title: tts.currentTitle ?? "Camera Capture"
-                    )
+                    tts.prepareNewFileOnly(text: combined, url: tts.currentURL, title: tts.currentTitle ?? "Camera Capture")
                 }
             }
 

@@ -27,6 +27,8 @@ enum AppVoiceMode: String, Codable {
 
 // MARK: - TTSPlayer
 
+// Reminder: UI should call `openFile(text:url:title:)` upon navigation/opening a new file to enforce immediate playback start and reset voice & highlight state.
+
 @MainActor
 final class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDelegate {
 
@@ -45,6 +47,10 @@ final class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, 
     @Published var currentURL: URL? = nil
     @Published var appVoice: AppVoiceMode = .system
     @Published var selectedVoiceSampleId: String = "1"
+    
+    // Tracks identity of the currently prepared content and the last content that actually started playback
+    @Published var preparedContentId: String? = nil
+    @Published var lastPlayedContentId: String? = nil
     
     // MARK: - Word Tokenization
     var wordTokens: [[WordToken]] = []  // Pre-tokenized words per sentence
@@ -77,6 +83,7 @@ final class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, 
             resetSession()
             currentURL = url
             currentTitle = title
+            preparedContentId = makeContentId(text: trimmed, url: url, title: title)
             return
         }
 
@@ -94,11 +101,62 @@ final class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, 
         currentTitle = title
         progress = 0.0
         state = .idle
+        preparedContentId = makeContentId(text: trimmed, url: url, title: title)
     }
     
-    func startReading(_ text: String, url: URL? = nil, title: String? = nil) {
-        // Prepare and immediately start from the beginning
-        prepare(text: text, url: url ?? currentURL, title: title ?? currentTitle)
+    /// Prepare a new file for playback (reset voice + highlight) but do NOT start speaking.
+    /// Use this when a bottom sheet opens or when you only want to prepare the current file.
+    func prepareNewFileOnly(text: String, url: URL?, title: String?) {
+        // Stop any ongoing playback from the previous file
+        synthesizer.stopSpeaking(at: .immediate)
+        audioPlayer?.stop()
+        audioPlayer = nil
+        backendWorker.cancel()
+
+        // Prepare fresh state for the new content
+        prepare(text: text, url: url, title: title)
+        preparedContentId = makeContentId(text: text, url: url, title: title)
+        lastPlayedContentId = nil
+
+        // Reset indices/highlighting to beginning
+        currentIndex = 0
+        currentSentenceText = sentences.first ?? ""
+        currentWordInSentence = ""
+        currentWordRange = nil
+        currentWordIndexInSentence = nil
+        currentWordToken = nil
+        position = .init(sentenceIndex: 0, wordNSRange: nil, wordIndex: nil)
+        progress = 0.0
+        state = .paused
+    }
+
+    /// Auto-starts playback from the beginning.
+    /// Open a new file and immediately start speaking it from the beginning (voice + highlight reset).
+    /// Call this directly when the user opens/navigates to a different file.
+    /// Note: Unlike `prepareNewFileOnly(...)`, this method auto-starts playback.
+    func openFile(text: String, url: URL?, title: String?) {
+        // Forget/stop anything from the previous file
+        synthesizer.stopSpeaking(at: .immediate)
+        audioPlayer?.stop()
+        audioPlayer = nil
+        backendWorker.cancel()
+
+        // Prepare and start fresh
+        prepare(text: text, url: url, title: title)
+        preparedContentId = makeContentId(text: text, url: url, title: title)
+        lastPlayedContentId = nil
+
+        currentIndex = 0
+        currentSentenceText = sentences.first ?? ""
+        currentWordInSentence = ""
+        currentWordRange = nil
+        currentWordIndexInSentence = nil
+        currentWordToken = nil
+        position = .init(sentenceIndex: 0, wordNSRange: nil, wordIndex: nil)
+        progress = 0.0
+        state = .idle
+
+        // Auto-start without waiting for Continue
         playFromCurrent()
     }
 
@@ -113,17 +171,84 @@ final class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, 
         progress = Double(currentIndex) / Double(max(1, sentences.count))
         // Update currentSentenceText before playing
         currentSentenceText = sentences[currentIndex]
+        lastPlayedContentId = preparedContentId
         playCurrentSentence(resumeAt: currentIndex)
     }
     
     func togglePlayPause() {
+        // If nothing prepared, nothing to do
+        guard !sentences.isEmpty else { return }
+
+        let contentChanged = (preparedContentId != nil && preparedContentId != lastPlayedContentId)
+
         switch appVoice {
         case .system:
-            // Ensured MainActor for smooth UI updates (free mode)
             Task { @MainActor in
-                toggleApplePlayPause()
+                if contentChanged {
+                    // Force a full restart from beginning with fresh voice + highlight
+                    synthesizer.stopSpeaking(at: .immediate)
+                    currentIndex = 0
+                    currentSentenceText = sentences.first ?? ""
+                    currentWordInSentence = ""
+                    currentWordRange = nil
+                    currentWordIndexInSentence = nil
+                    currentWordToken = nil
+                    position = .init(sentenceIndex: 0, wordNSRange: nil, wordIndex: nil)
+                    progress = 0.0
+                    playFromCurrent()
+                    return
+                }
+                switch state {
+                case .playing:
+                    synthesizer.pauseSpeaking(at: .immediate)
+                    state = .paused
+                case .paused:
+                    synthesizer.continueSpeaking()
+                    state = .playing
+                case .idle, .finished:
+                    currentIndex = 0
+                    currentSentenceText = sentences.first ?? ""
+                    currentWordInSentence = ""
+                    currentWordRange = nil
+                    currentWordIndexInSentence = nil
+                    currentWordToken = nil
+                    position = .init(sentenceIndex: 0, wordNSRange: nil, wordIndex: nil)
+                    progress = 0.0
+                    playFromCurrent()
+                }
             }
-        case .backend: toggleBackendPlayPause()
+        case .backend:
+            if contentChanged {
+                backendWorker.cancel()
+                currentIndex = 0
+                currentSentenceText = sentences.first ?? ""
+                currentWordInSentence = ""
+                currentWordRange = nil
+                currentWordIndexInSentence = nil
+                currentWordToken = nil
+                position = .init(sentenceIndex: 0, wordNSRange: nil, wordIndex: nil)
+                progress = 0.0
+                startBackendFlow(resumeAt: currentIndex)
+                return
+            }
+            switch state {
+            case .playing:
+                backendWorker.pause()
+                state = .paused
+            case .paused:
+                backendWorker.resume()
+                state = .playing
+            case .idle, .finished:
+                currentIndex = 0
+                currentSentenceText = sentences.first ?? ""
+                currentWordInSentence = ""
+                currentWordRange = nil
+                currentWordIndexInSentence = nil
+                currentWordToken = nil
+                position = .init(sentenceIndex: 0, wordNSRange: nil, wordIndex: nil)
+                progress = 0.0
+                startBackendFlow(resumeAt: currentIndex)
+            }
         }
     }
 
@@ -166,6 +291,8 @@ final class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, 
         state = .idle
         currentTitle = nil
         currentURL = nil
+        preparedContentId = nil
+        lastPlayedContentId = nil
     }
 
     func nextSentence() {
@@ -406,6 +533,7 @@ final class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, 
             currentWordIndexInSentence = nil
             currentWordToken = nil
             position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
+            lastPlayedContentId = preparedContentId
             state = .playing
             playCurrentSentence(resumeAt: currentIndex)
         } else {
@@ -490,6 +618,13 @@ final class TTSPlayer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, 
         // Split by whitespace; basic tokenization (normalizer can replace)
         let tokens = prefix.split { $0.isWhitespace }.count
         return tokens
+    }
+    
+    private func makeContentId(text: String, url: URL?, title: String?) -> String {
+        let u = url?.absoluteString ?? ""
+        let t = title ?? ""
+        let key = "\(t)\n\(u)\n\(text)"
+        return String(key.hashValue)
     }
 }
 

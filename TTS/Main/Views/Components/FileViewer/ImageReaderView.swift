@@ -174,12 +174,8 @@ struct ImageReaderView: View {
                     recognizedText = combined
                     wordBoxes = boxes
 
-                    // ✅ Start reading automatically
-                    tts.stop()
-                    tts.startReading(
-                        combined,
-                        title: tts.currentTitle ?? "Image Reader"
-                    )
+                    // Prepare the recognized text as the current file (do not auto-start)
+                    tts.prepareNewFileOnly(text: combined, url: tts.currentURL, title: tts.currentTitle ?? "Image Reader")
 
                     // ✅ Auto-save the cropped image after OCR
                     saveImageToDisk()

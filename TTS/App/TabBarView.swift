@@ -139,6 +139,9 @@ struct TabBarView: View {
                     }
                     // Navigate to the picked file immediately if available
                     if let u = resolvedURL {
+                        // Restart TTS for this new file and pause (no auto-start)
+                        tts.stop()
+                        tts.prepareNewFileOnly(text: "", url: u, title: u.lastPathComponent)
                         // Check TTS state: if stopped (idle/finished), stop it; if playing/paused, let it continue
                         if tts.state == .idle || tts.state == .finished {
                             tts.stop()
@@ -163,6 +166,9 @@ struct TabBarView: View {
                         // Fallback: still add without bookmark if it failed
                         recentStore.addExternal(fileURL: url, bookmarkData: Data(), kind: .files)
                     }
+                    // Restart TTS for this new file and pause (no auto-start)
+                    tts.stop()
+                    tts.prepareNewFileOnly(text: "", url: url, title: url.lastPathComponent)
                     // Check TTS state: if stopped (idle/finished), stop it; if playing/paused, let it continue
                     if tts.state == .idle || tts.state == .finished {
                         tts.stop()
@@ -175,6 +181,9 @@ struct TabBarView: View {
             }
             .sheet(isPresented: $showCameraReader) {
                 ImageReaderView(tts: tts, source: .camera) { url in
+                    // Restart TTS for this new file and pause (no auto-start)
+                    tts.stop()
+                    tts.prepareNewFileOnly(text: "", url: url, title: url.lastPathComponent)
                     do {
                         let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
                         recentStore.addExternal(fileURL: url, bookmarkData: bookmark, kind: .scan)
@@ -187,6 +196,9 @@ struct TabBarView: View {
             }
             .sheet(isPresented: $showPhotoReader) {
                 ImageReaderView(tts: tts, source: .gallery) { url in
+                    // Restart TTS for this new file and pause (no auto-start)
+                    tts.stop()
+                    tts.prepareNewFileOnly(text: "", url: url, title: url.lastPathComponent)
                     do {
                         let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
                         recentStore.addExternal(fileURL: url, bookmarkData: bookmark, kind: .photos)
@@ -201,6 +213,9 @@ struct TabBarView: View {
                 WebReaderView(url: item.url) { extractedText in
                     DispatchQueue.main.async {
                         Logger.log("[TabBarView] Web extraction finished, opening TextInputView. Extracted length: \(extractedText.count)")
+                        // Restart TTS and pause for the upcoming text input flow
+                        tts.stop()
+                        tts.prepareNewFileOnly(text: extractedText, url: nil, title: "Web Page")
                         prefilledLinkText = extractedText
                         showTextInput = true
                     }
@@ -210,6 +225,9 @@ struct TabBarView: View {
             .sheet(isPresented: $showLinkInput) {
                 LinkInputView(isPresented: $showLinkInput, linkText: $linkInputText) { url in
                     Logger.log("[TabBarView] Received link input: \(url.absoluteString)")
+                    // Restart and pause for new web content context
+                    tts.stop()
+                    tts.prepareNewFileOnly(text: "", url: url, title: url.absoluteString)
                     DispatchQueue.main.async {
                         Logger.log("[TabBarView] Showing WebReaderView sheet")
                         webLinkItem = IdentifiableURL(url: url)

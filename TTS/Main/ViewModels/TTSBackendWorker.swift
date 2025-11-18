@@ -262,6 +262,7 @@ final class TTSBackendWorker {
             audioPlayer?.prepareToPlay()
             player.currentIndex = order - 1
             player.currentSentenceText = sentences[player.currentIndex]
+            player.lastPlayedContentId = player.preparedContentId
             player.progress = Double(order) / Double(max(1, sentences.count))
             audioPlayer?.play()
             player.state = .playing
@@ -286,3 +287,4 @@ final class TTSBackendWorker {
         return currentIndex < sentences.count - 1
     }
 }
+

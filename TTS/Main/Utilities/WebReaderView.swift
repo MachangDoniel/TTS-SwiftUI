@@ -65,11 +65,11 @@ struct WebReaderView: View {
             }
 
             DispatchQueue.main.async {
-                dismiss()
-                tts.stop() // ✅ stop current speech before new one
+                self.dismiss()
+                // Stop any ongoing playback and prepare the new content without auto-start
+                tts.prepareNewFileOnly(text: text, url: self.url, title: self.pageTitle)
                 onExtracted(text)
-                tts.startReading(text, title: pageTitle)
-                Logger.log("✅ Extracted text from web page (\(text.count) chars) — title: \(pageTitle)")
+                Logger.log("✅ Extracted text from web page (\(text.count) chars) — title: \(self.pageTitle)")
             }
         }
     }
