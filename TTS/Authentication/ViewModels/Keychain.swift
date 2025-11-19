@@ -42,3 +42,17 @@ enum KeychainService {
         return String(data: data, encoding: .utf8)
     }
 }
+
+/// An extension on KeychainService providing asynchronous access to the load function.
+extension KeychainService {
+    /// Asynchronously loads data from the keychain for the given key.
+    ///
+    /// - Parameter key: The key for which to load data.
+    /// - Returns: The data associated with the key, or nil if no data exists.
+    static func loadAsync(key: String) async -> Data? {
+        await withCheckedContinuation { continuation in
+            let data = load(key: key)
+            continuation.resume(returning: data)
+        }
+    }
+}

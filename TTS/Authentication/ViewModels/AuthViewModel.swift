@@ -12,8 +12,10 @@ import Combine
 @MainActor
 final class AuthViewModel: ObservableObject {
     @Published var tokenData: TokenData?
+    @Published var apiError: APIError?
     @Published var errorMessage: String?
     @Published var isLoading = false
+    @Published var hasLoadedFromKeychain = false
     
     private var isRefreshing = false
     private var refreshWaiters: [CheckedContinuation<Bool, Error>] = []
@@ -33,7 +35,7 @@ final class AuthViewModel: ObservableObject {
             saveTokenData()
             Logger.log("✅ Login successful: \(response.data.accessToken)")
         } catch {
-            errorMessage = error.localizedDescription
+            apiError = APIError.network(error)
             Logger.log("❌ Login failed: \(error.localizedDescription)")
         }
     }
@@ -122,7 +124,7 @@ final class AuthViewModel: ObservableObject {
         } catch {
             clearTokenData()
             notifyLogout(reason: .invalidRefreshToken)
-            errorMessage = "Failed to logout. Please try again."
+            apiError = APIError.network(error)
             Logger.log("❌ Logout failed: \(error.localizedDescription)")
         }
     }
@@ -162,18 +164,52 @@ final class AuthViewModel: ObservableObject {
     }
     
     private enum LogoutReason {
+        case userInitiated
+        case unauthorized
         case invalidRefreshToken
         case maxRetryReached
     }
     
     private func notifyLogout(reason: LogoutReason) {
         switch reason {
+        case .userInitiated:
+            apiError = .unauthorized
+        case .unauthorized:
+            apiError = .unauthorized
         case .invalidRefreshToken:
-            errorMessage = "Your session has expired. Please sign in again."
+            apiError = .unauthorized
         case .maxRetryReached:
-            errorMessage = "Failed to refresh session after multiple attempts. Please sign in again."
+            apiError = .server(401)
         }
-        // Additional actions to notify UI or navigate to login can be added here later
+        // Additional UI handling can be added later
+    }
+    
+    // MARK: - JWT Helpers
+    /// Attempts to decode the `exp` (expiry) claim from a JWT access token and return it as a Date.
+    /// Returns nil if decoding fails or the claim is not present.
+    private static func decodeJWTExpiry(from jwt: String) -> Date? {
+        // JWT format: header.payload.signature (Base64URL)
+        let parts = jwt.split(separator: ".")
+        guard parts.count >= 2 else { return nil }
+        let payloadPart = String(parts[1])
+
+        // Convert Base64URL to Base64 by replacing URL-safe characters and padding
+        var base64 = payloadPart.replacingOccurrences(of: "-", with: "+")
+                                 .replacingOccurrences(of: "_", with: "/")
+        let paddingLength = 4 - (base64.count % 4)
+        if paddingLength < 4 { base64 += String(repeating: "=", count: paddingLength) }
+
+        guard let data = Data(base64Encoded: base64) else { return nil }
+        guard let json = try? JSONSerialization.jsonObject(with: data, options: []),
+              let dict = json as? [String: Any] else { return nil }
+
+        // `exp` is seconds since epoch
+        if let exp = dict["exp"] as? Double {
+            return Date(timeIntervalSince1970: exp)
+        } else if let expInt = dict["exp"] as? Int {
+            return Date(timeIntervalSince1970: TimeInterval(expInt))
+        }
+        return nil
     }
 }
 
@@ -188,12 +224,29 @@ extension AuthViewModel {
         }
     }
 
-    func loadTokenData() {
-        guard let data = KeychainService.load(key: tokenKey),
+    func loadTokenData() async {
+        guard let data = await KeychainService.loadAsync(key: tokenKey),
               let decoded = try? JSONDecoder().decode(TokenData.self, from: data) else {
             return
         }
+        // Validate expiry using JWT `exp` if present in access token
+        let accessToken = decoded.accessToken
+        if let expDate = Self.decodeJWTExpiry(from: accessToken), expDate < Date() {
+            // Token expired, clear and request refresh later
+            clearTokenData()
+            return
+        }
+
+        // Persist decoded token in memory
         self.tokenData = decoded
+    }
+
+    // New async wrapper used by the view
+    func loadTokenDataIfNeeded() async {
+        if !hasLoadedFromKeychain {
+            await loadTokenData()
+            hasLoadedFromKeychain = true
+        }
     }
 
     func clearTokenData() {
@@ -201,3 +254,4 @@ extension AuthViewModel {
         self.tokenData = nil
     }
 }
+
