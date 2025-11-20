@@ -26,6 +26,9 @@ struct DocumentPicker: UIViewControllerRepresentable {
     /// Optional callback if user cancels the picker
     var onCancel: (() -> Void)? = nil
 
+}
+
+extension DocumentPicker {
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: supportedTypes)
         picker.delegate = context.coordinator
@@ -39,7 +42,9 @@ struct DocumentPicker: UIViewControllerRepresentable {
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
+}
 
+extension DocumentPicker {
     // MARK: - Coordinator
     class Coordinator: NSObject, UIDocumentPickerDelegate {
         let parent: DocumentPicker

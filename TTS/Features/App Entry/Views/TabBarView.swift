@@ -14,6 +14,7 @@ struct IdentifiableURL: Identifiable {
 
 struct TabBarView: View {
     @State private var selectedTab: Int = 0
+    @State private var didFirstAppear = false
     
     @State private var showDocumentPicker: Bool = false
     @State private var showTextInput = false
@@ -32,9 +33,8 @@ struct TabBarView: View {
     @EnvironmentObject var tts: TTSPlayer
 
     var body: some View {
-        NavigationStack {
-            TabView(selection: $selectedTab) {
-                // Home Tab
+        TabView(selection: $selectedTab) {
+            NavigationStack {
                 HomeView(
                     onPickFiles: { showDocumentPicker = true },
                     onPickGDrive: { /* TODO */ },
@@ -101,167 +101,175 @@ struct TabBarView: View {
                         }
                     }
                 )
-                .tabItem { Label("Home", systemImage: "house.fill") }
-                .tag(0)
                 .environmentObject(recentStore)
-                
-                Spacer()
-
-                // Library Tab
+            }
+            .tabItem { Label("Home", systemImage: "house.fill") }
+            .tag(0)
+            
+            Spacer()
+            
+            NavigationStack {
                 LibraryView()
-                    .tabItem { Label("Library", systemImage: "tray.fill") }
-                    .tag(1)
                     .environmentObject(recentStore)
                     .environmentObject(tts)
-                
-                Spacer()
+            }
+            .tabItem { Label("Library", systemImage: "tray.fill") }
+            .tag(1)
 
-                // Profile Tab (placeholder)
+            Spacer()
+            
+            NavigationStack {
                 ProfileView()
-                    .preferredColorScheme(.dark)
-                    .tabItem { Label("Profile", systemImage: "person.crop.circle") }
-                    .tag(2)
             }
-            .sheet(isPresented: $showDocumentPicker) {
-                DocumentPicker { url in
-                    var resolvedURL: URL? = nil
-                    if url.startAccessingSecurityScopedResource() {
-                        do {
-                            let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
-                            // Store recent using bookmark (no full copy)
-                            recentStore.addExternal(fileURL: url, bookmarkData: bookmark, kind: .files)
-                            resolvedURL = url
-                        } catch {
-                            Logger.log("Failed to create bookmark: \(error)")
-                            // Even if bookmark fails, still try to open immediately with active access
-                            resolvedURL = url
-                        }
-                    }
-                    // Navigate to the picked file immediately if available
-                    if let u = resolvedURL {
-                        // Restart TTS for this new file and pause (no auto-start)
-                        tts.stop()
-                        tts.prepareNewFileOnly(text: "", url: u, title: u.lastPathComponent)
-                        // Check TTS state: if stopped (idle/finished), stop it; if playing/paused, let it continue
-                        if tts.state == .idle || tts.state == .finished {
-                            tts.stop()
-                        }
-                        // If playing/paused, let it continue - FileViewer will handle preparation
-                        selectedDocumentURL = u
-                        selectedDocumentItem = IdentifiableURL(url: u)
-                    }
-                }
+            .tabItem { Label("Profile", systemImage: "person.crop.circle") }
+            .tag(2)
+        }
+        .preferredColorScheme(.dark)
+        .toolbarBackground(.automatic, for: .tabBar)
+        .onAppear {
+            if !didFirstAppear {
+                didFirstAppear = true
             }
-            .sheet(isPresented: $showTextInput) {
-                TextInputView(
-                    tts: tts,
-                    prefilledText: prefilledLinkText ?? ""
-                ) { url in
+        }
+        .sheet(isPresented: $showDocumentPicker) {
+            DocumentPicker { url in
+                var resolvedURL: URL? = nil
+                if url.startAccessingSecurityScopedResource() {
                     do {
                         let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+                        // Store recent using bookmark (no full copy)
                         recentStore.addExternal(fileURL: url, bookmarkData: bookmark, kind: .files)
-                        Logger.log("[TabBarView] Added text file to recents with bookmark")
+                        resolvedURL = url
                     } catch {
-                        Logger.log("[TabBarView] Bookmark error (text): \(error.localizedDescription)")
-                        // Fallback: still add without bookmark if it failed
-                        recentStore.addExternal(fileURL: url, bookmarkData: Data(), kind: .files)
+                        Logger.log("Failed to create bookmark: \(error)")
+                        // Even if bookmark fails, still try to open immediately with active access
+                        resolvedURL = url
                     }
+                }
+                // Navigate to the picked file immediately if available
+                if let u = resolvedURL {
                     // Restart TTS for this new file and pause (no auto-start)
                     tts.stop()
-                    tts.prepareNewFileOnly(text: "", url: url, title: url.lastPathComponent)
+                    tts.prepareNewFileOnly(text: "", url: u, title: u.lastPathComponent)
                     // Check TTS state: if stopped (idle/finished), stop it; if playing/paused, let it continue
                     if tts.state == .idle || tts.state == .finished {
                         tts.stop()
                     }
                     // If playing/paused, let it continue - FileViewer will handle preparation
-                    selectedTab = 0
-                    selectedDocumentURL = url
-                    selectedDocumentItem = IdentifiableURL(url: url)
-                }
-            }
-            .sheet(isPresented: $showCameraReader) {
-                ImageReaderView(tts: tts, source: .camera) { url in
-                    // Restart TTS for this new file and pause (no auto-start)
-                    tts.stop()
-                    tts.prepareNewFileOnly(text: "", url: url, title: url.lastPathComponent)
-                    do {
-                        let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
-                        recentStore.addExternal(fileURL: url, bookmarkData: bookmark, kind: .scan)
-                    } catch {
-                        Logger.log("Bookmark error (scan): \(error.localizedDescription)")
-                        // Fallback: still add without bookmark if it failed
-                        recentStore.addExternal(fileURL: url, bookmarkData: Data(), kind: .scan)
-                    }
-                }
-            }
-            .sheet(isPresented: $showPhotoReader) {
-                ImageReaderView(tts: tts, source: .gallery) { url in
-                    // Restart TTS for this new file and pause (no auto-start)
-                    tts.stop()
-                    tts.prepareNewFileOnly(text: "", url: url, title: url.lastPathComponent)
-                    do {
-                        let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
-                        recentStore.addExternal(fileURL: url, bookmarkData: bookmark, kind: .photos)
-                    } catch {
-                        Logger.log("Bookmark error (photos): \(error.localizedDescription)")
-                        // Fallback: still add without bookmark if it failed
-                        recentStore.addExternal(fileURL: url, bookmarkData: Data(), kind: .photos)
-                    }
-                }
-            }
-            .sheet(item: $webLinkItem) { item in
-                WebReaderView(url: item.url) { extractedText in
-                    DispatchQueue.main.async {
-                        Logger.log("[TabBarView] Web extraction finished, opening TextInputView. Extracted length: \(extractedText.count)")
-                        // Restart TTS and pause for the upcoming text input flow
-                        tts.stop()
-                        tts.prepareNewFileOnly(text: extractedText, url: nil, title: "Web Page")
-                        prefilledLinkText = extractedText
-                        showTextInput = true
-                    }
-                }
-                .environmentObject(tts)
-            }
-            .sheet(isPresented: $showLinkInput) {
-                LinkInputView(isPresented: $showLinkInput, linkText: $linkInputText) { url in
-                    Logger.log("[TabBarView] Received link input: \(url.absoluteString)")
-                    // Restart and pause for new web content context
-                    tts.stop()
-                    tts.prepareNewFileOnly(text: "", url: url, title: url.absoluteString)
-                    DispatchQueue.main.async {
-                        Logger.log("[TabBarView] Showing WebReaderView sheet")
-                        webLinkItem = IdentifiableURL(url: url)
-                    }
-                }
-            }
-            
-            // Present FileViewer as fullScreenCover when a document is picked
-            .fullScreenCover(item: $selectedDocumentItem) { item in
-                AccessingFileViewer(url: item.url, tts: tts)
-            }
-            .overlay(alignment: .bottom) {
-                if tts.hasActiveItem {
-                    MiniTTSControlView(ttsPlayer: tts, title: tts.currentTitle ?? "Now Playing", onTap: {
-                        if let url = tts.currentURL {
-                            selectedTab = 0
-                            selectedDocumentURL = url
-                            selectedDocumentItem = IdentifiableURL(url: url)
-                        } else if let url = selectedDocumentURL {
-                            // Fallback: navigate to the last selected document
-                            selectedTab = 0
-                            selectedDocumentURL = url
-                            selectedDocumentItem = IdentifiableURL(url: url)
-                        } else {
-                            Logger.log("Nothing to play or open")
-                            // Optional: show a message to the user
-                            // e.g., present an alert or haptic to indicate there's nothing to open
-                        }
-                    })
-                    .padding(.bottom, 56) // keep above the tab bar (approx 49) + spacing
+                    selectedDocumentURL = u
+                    selectedDocumentItem = IdentifiableURL(url: u)
                 }
             }
         }
-        .background(Color(.black))
+        .sheet(isPresented: $showTextInput) {
+            TextInputView(
+                tts: tts,
+                prefilledText: prefilledLinkText ?? ""
+            ) { url in
+                do {
+                    let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+                    recentStore.addExternal(fileURL: url, bookmarkData: bookmark, kind: .files)
+                    Logger.log("[TabBarView] Added text file to recents with bookmark")
+                } catch {
+                    Logger.log("[TabBarView] Bookmark error (text): \(error.localizedDescription)")
+                    // Fallback: still add without bookmark if it failed
+                    recentStore.addExternal(fileURL: url, bookmarkData: Data(), kind: .files)
+                }
+                // Restart TTS for this new file and pause (no auto-start)
+                tts.stop()
+                tts.prepareNewFileOnly(text: "", url: url, title: url.lastPathComponent)
+                // Check TTS state: if stopped (idle/finished), stop it; if playing/paused, let it continue
+                if tts.state == .idle || tts.state == .finished {
+                    tts.stop()
+                }
+                // If playing/paused, let it continue - FileViewer will handle preparation
+                selectedTab = 0
+                selectedDocumentURL = url
+                selectedDocumentItem = IdentifiableURL(url: url)
+            }
+        }
+        .sheet(isPresented: $showCameraReader) {
+            ImageReaderView(tts: tts, source: .camera) { url in
+                // Restart TTS for this new file and pause (no auto-start)
+                tts.stop()
+                tts.prepareNewFileOnly(text: "", url: url, title: url.lastPathComponent)
+                do {
+                    let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+                    recentStore.addExternal(fileURL: url, bookmarkData: bookmark, kind: .scan)
+                } catch {
+                    Logger.log("Bookmark error (scan): \(error.localizedDescription)")
+                    // Fallback: still add without bookmark if it failed
+                    recentStore.addExternal(fileURL: url, bookmarkData: Data(), kind: .scan)
+                }
+            }
+        }
+        .sheet(isPresented: $showPhotoReader) {
+            ImageReaderView(tts: tts, source: .gallery) { url in
+                // Restart TTS for this new file and pause (no auto-start)
+                tts.stop()
+                tts.prepareNewFileOnly(text: "", url: url, title: url.lastPathComponent)
+                do {
+                    let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+                    recentStore.addExternal(fileURL: url, bookmarkData: bookmark, kind: .photos)
+                } catch {
+                    Logger.log("Bookmark error (photos): \(error.localizedDescription)")
+                    // Fallback: still add without bookmark if it failed
+                    recentStore.addExternal(fileURL: url, bookmarkData: Data(), kind: .photos)
+                }
+            }
+        }
+        .sheet(item: $webLinkItem) { item in
+            WebReaderView(url: item.url) { extractedText in
+                DispatchQueue.main.async {
+                    Logger.log("[TabBarView] Web extraction finished, opening TextInputView. Extracted length: \(extractedText.count)")
+                    // Restart TTS and pause for the upcoming text input flow
+                    tts.stop()
+                    tts.prepareNewFileOnly(text: extractedText, url: nil, title: "Web Page")
+                    prefilledLinkText = extractedText
+                    showTextInput = true
+                }
+            }
+            .environmentObject(tts)
+        }
+        .sheet(isPresented: $showLinkInput) {
+            LinkInputView(isPresented: $showLinkInput, linkText: $linkInputText) { url in
+                Logger.log("[TabBarView] Received link input: \(url.absoluteString)")
+                // Restart and pause for new web content context
+                tts.stop()
+                tts.prepareNewFileOnly(text: "", url: url, title: url.absoluteString)
+                DispatchQueue.main.async {
+                    Logger.log("[TabBarView] Showing WebReaderView sheet")
+                    webLinkItem = IdentifiableURL(url: url)
+                }
+            }
+        }
+        
+        // Present FileViewer as fullScreenCover when a document is picked
+        .fullScreenCover(item: $selectedDocumentItem) { item in
+            AccessingFileViewer(url: item.url, tts: tts)
+        }
+        .overlay(alignment: .bottom) {
+            if didFirstAppear, tts.hasActiveItem {
+                MiniTTSControlView(ttsPlayer: tts, title: tts.currentTitle ?? "Now Playing", onTap: {
+                    if let url = tts.currentURL {
+                        selectedTab = 0
+                        selectedDocumentURL = url
+                        selectedDocumentItem = IdentifiableURL(url: url)
+                    } else if let url = selectedDocumentURL {
+                        // Fallback: navigate to the last selected document
+                        selectedTab = 0
+                        selectedDocumentURL = url
+                        selectedDocumentItem = IdentifiableURL(url: url)
+                    } else {
+                        Logger.log("Nothing to play or open")
+                        // Optional: show a message to the user
+                        // e.g., present an alert or haptic to indicate there's nothing to open
+                    }
+                })
+                .padding(.bottom, 56) // keep above the tab bar (approx 49) + spacing
+            }
+        }
+        .background(Color.black.ignoresSafeArea())
     }
 
     func copyToLocal(url: URL) -> URL? {
@@ -314,4 +322,3 @@ struct TabBarView: View {
 #Preview {
     TabBarView()
 }
-

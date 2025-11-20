@@ -8,16 +8,6 @@
 import Foundation
 import Alamofire
 
-//
-//  APIClient.swift
-//  TTS
-//
-//  Created by Doniel Tripura on 10/19/25.
-//
-
-import Foundation
-import Alamofire
-
 // MARK: - Weak AuthViewModel singleton for APIClient integration
 private weak var globalAuthVM: AuthViewModel? = nil
 

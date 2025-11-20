@@ -9,9 +9,9 @@ import SwiftUI
 
 enum InputSource: String, CaseIterable, Identifiable, Codable {
     case files, gdrive, photos, scan, dbox, book, text, link
-
+    
     var id: String { rawValue }
-
+    
     var title: String {
         switch self {
         case .files: return "Files"
@@ -24,7 +24,7 @@ enum InputSource: String, CaseIterable, Identifiable, Codable {
         case .link: return "Link"
         }
     }
-
+    
     var systemIcon: String {
         switch self {
         case .files: return "folder.fill"
@@ -37,7 +37,7 @@ enum InputSource: String, CaseIterable, Identifiable, Codable {
         case .link: return "link"
         }
     }
-
+    
     var tint: Color {
         switch self {
         case .files: return .white
@@ -50,23 +50,23 @@ enum InputSource: String, CaseIterable, Identifiable, Codable {
         case .link: return .white
         }
     }
-
+    
     static var defaultOrder: [InputSource] {
         return [.files, .gdrive, .photos, .scan, .dbox, .book, .text, .link]
     }
     
     var fileCategory: FileCategory {
-           switch self {
-           case .text:
-               return .text
-           case .photos:
-               return .image
-           case .files, .book, .dbox:
-               return .pdf  // assuming most imported documents are PDFs
-           case .scan:
-               return .image
-           case .gdrive, .link:
-               return .all  // these can contain mixed types
-           }
-       }
+        switch self {
+        case .text:
+            return .text
+        case .photos:
+            return .image
+        case .files, .book, .dbox:
+            return .pdf  // assuming most imported documents are PDFs
+        case .scan:
+            return .image
+        case .gdrive, .link:
+            return .all  // these can contain mixed types
+        }
+    }
 }

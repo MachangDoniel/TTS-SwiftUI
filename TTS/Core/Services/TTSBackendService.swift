@@ -10,7 +10,7 @@ import Foundation
 import AVFoundation
 
 @MainActor
-final class TTSBackendWorker {
+final class TTSBackendService {
     private let taskViewModel = TaskViewModel()
     private let speechViewModel = SpeechViewModel()
     private var audioCache: [Int: URL] = [:]
@@ -20,9 +20,9 @@ final class TTSBackendWorker {
     private var audioPlayer: AVAudioPlayer?
     private let downloadQueue = DispatchQueue(label: "tts.backend.download")
     private var activeVoiceSampleId: String?
-
+    
     // MARK: - Core Controls
-
+    
     func startFlow(
         sentences: [String],
         currentIndex: Int,
@@ -34,14 +34,14 @@ final class TTSBackendWorker {
         let resumeIndexRaw = resumeAt ?? currentIndex
         let resumeIndex = max(0, min(resumeIndexRaw, sentences.count - 1))
         let requestedVoice = selectedVoiceSampleId
-
+        
         if activeVoiceSampleId != requestedVoice {
             pruneCacheForNewVoice(resumingAt: resumeIndex)
             activeVoiceSampleId = requestedVoice
         }
-
+        
         backendWorkerTask?.cancel()
-
+        
         backendWorkerTask = Task.detached(priority: .utility) { [weak self] in
             guard let self else { return }
             do {
@@ -56,7 +56,7 @@ final class TTSBackendWorker {
             }
         }
     }
-
+    
     func cancel() {
         backendWorkerTask?.cancel()
         backendTaskId = nil
@@ -66,16 +66,16 @@ final class TTSBackendWorker {
         audioPlayer = nil
         activeVoiceSampleId = nil
     }
-
+    
     func pause() { audioPlayer?.pause() }
     func resume() { audioPlayer?.play() }
-
+    
     func stopCurrent(player: TTSPlayer) {
         audioPlayer?.stop()
         audioPlayer = nil
         player.state = .idle
     }
-
+    
     func cancelGenerationOnly(keepingAudio: Bool) {
         backendWorkerTask?.cancel()
         backendWorkerTask = nil
@@ -87,20 +87,20 @@ final class TTSBackendWorker {
             audioPlayer = nil
         }
     }
-
+    
     func refreshVoice(with voiceId: String, currentIndex: Int, sentences: [String], player: TTSPlayer) {
         guard appHasUpcomingSentence(currentIndex: currentIndex, sentences: sentences) else { return }
-
+        
         // Keep audio up to the sentence currently playing; regenerate future chunks.
         let keepOrderUpperBound = currentIndex + 1
         audioCache = audioCache.filter { $0.key <= keepOrderUpperBound }
-
+        
         backendWorkerTask?.cancel()
         backendWorkerTask = nil
         backendRequestId = nil
         backendTaskId = nil
         activeVoiceSampleId = nil
-
+        
         let resumeIndex = min(currentIndex + 1, sentences.count - 1)
         startFlow(
             sentences: sentences,
@@ -110,7 +110,10 @@ final class TTSBackendWorker {
             resumeAt: resumeIndex
         )
     }
+}
 
+extension TTSBackendService {
+    
     func playNext(from index: Int, sentences: [String], player: TTSPlayer) {
         guard !sentences.isEmpty else { return }
         let nextOrder = index + 1
@@ -126,7 +129,7 @@ final class TTSBackendWorker {
             )
         }
     }
-
+    
     func playPrevious(from index: Int, sentences: [String], player: TTSPlayer) {
         guard index >= 0 else { return }
         let order = index + 1
@@ -147,7 +150,7 @@ final class TTSBackendWorker {
             )
         }
     }
-
+    
     func handleAudioFinished(player: TTSPlayer) {
         Task { @MainActor in
             let justPlayedOrder = player.currentIndex + 1
@@ -171,7 +174,10 @@ final class TTSBackendWorker {
             }
         }
     }
+}
 
+extension TTSBackendService {
+    
     // MARK: - Private Backend Logic
     private func prepareAndGenerate(
         sentences: [String],
@@ -190,13 +196,13 @@ final class TTSBackendWorker {
             )
             backendTaskId = await taskViewModel.taskId
         }
-
+        
         guard let ensuredTaskId = backendTaskId else { return }
-
+        
         for order in (resumeIndex + 1)...sentences.count {
             if Task.isCancelled { return }
             let text = sentences[order - 1]
-
+            
             let currentRequest = backendRequestId
             await speechViewModel.generateSpeech(
                 taskId: ensuredTaskId,
@@ -204,11 +210,11 @@ final class TTSBackendWorker {
                 inputText: text,
                 order: order
             )
-
+            
             if backendRequestId == nil {
                 backendRequestId = await speechViewModel.speechData?.requestId
             }
-
+            
             var downloadURL: String?
             while downloadURL == nil {
                 try await Task.sleep(nanoseconds: 1_500_000_000)
@@ -221,7 +227,7 @@ final class TTSBackendWorker {
                 )
                 downloadURL = await speechViewModel.speechData?.downloadUrl
             }
-
+            
             if let urlStr = downloadURL, let remote = URL(string: urlStr) {
                 do {
                     let local = try await downloadToCache(remote: remote, order: order)
@@ -237,7 +243,7 @@ final class TTSBackendWorker {
             }
         }
     }
-
+    
     private func downloadToCache(remote: URL, order: Int) async throws -> URL {
         try await withCheckedThrowingContinuation { cont in
             downloadQueue.async {
@@ -253,6 +259,9 @@ final class TTSBackendWorker {
             }
         }
     }
+}
+
+extension TTSBackendService {
 
     private func playAudio(from url: URL, order: Int, sentences: [String], player: TTSPlayer) {
         do {
@@ -287,4 +296,3 @@ final class TTSBackendWorker {
         return currentIndex < sentences.count - 1
     }
 }
-

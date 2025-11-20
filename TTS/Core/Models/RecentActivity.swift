@@ -92,7 +92,9 @@ struct RecentActivity: Identifiable, Codable, Equatable {
         guard let url = resolvedURL, url.isFileURL else { return false }
         return FileManager.default.fileExists(atPath: url.path)
     }
+}
 
+extension RecentActivity {
     // MARK: - Text Persistence Helpers
     static func makeTextActivity(title: String, text: String) throws -> RecentActivity {
         let sanitizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
