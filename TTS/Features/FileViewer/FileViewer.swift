@@ -188,7 +188,7 @@ struct FileViewerTTSControlWrapper: View {
     let fileURL: URL
     
     var body: some View {
-        TTSControlView(tts: tts, text: text)
+        FullPlayerView(tts: tts, text: text)
             .onChange(of: tts.state) { newState in
                 // When state changes to playing, ensure it's playing the correct file
                 if newState == .playing {

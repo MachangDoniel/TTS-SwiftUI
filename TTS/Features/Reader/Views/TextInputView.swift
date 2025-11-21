@@ -74,7 +74,7 @@ struct TextInputView: View {
             }
 
             // MARK: - TTS Controls
-            TTSControlView(tts: tts, text: inputText)
+            FullPlayerView(tts: tts, text: inputText)
                 .background(Color.black)
         }
         .background(Color.black.ignoresSafeArea())

@@ -1,5 +1,5 @@
 //
-//  MiniTTSBar.swift
+//  MiniPlayerView.swift
 //  TTS
 //
 //  Created by Doniel Tripura on 10/5/25.
@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct MiniTTSControlView: View {
+struct MiniPlayerView: View {
     @ObservedObject var ttsPlayer: TTSPlayer
     let title: String
     var onTap: (() -> Void)? = nil

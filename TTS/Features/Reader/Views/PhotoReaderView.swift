@@ -1,8 +1,8 @@
 //
-//  CameraReaderView.swift
+//  PhotoReaderView.swift
 //  TTS
 //
-//  Created by Doniel Tripura on 10/22/25.
+//  Created by Doniel Tripura on 10/21/25.
 //
 
 import SwiftUI
@@ -10,7 +10,7 @@ import Vision
 import AVFAudio
 import UIKit
 
-struct CameraReaderView: View {
+struct PhotoReaderView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var tts: TTSPlayer
     var onSaved: ((URL) -> Void)? = nil
@@ -18,7 +18,7 @@ struct CameraReaderView: View {
     @State private var image: UIImage? = nil
     @State private var wordBoxes: [OCRWordBox] = []
     @State private var recognizedText: String = ""
-    @State private var isShowingCamera = true
+    @State private var isShowingImagePicker = true
     @State private var isProcessing = false
 
     var body: some View {
@@ -30,9 +30,7 @@ struct CameraReaderView: View {
                     dismiss()
                 }
                 .foregroundColor(.white)
-
                 Spacer()
-
                 if image != nil {
                     Button("Save File") {
                         saveImageToDisk()
@@ -43,7 +41,7 @@ struct CameraReaderView: View {
             .padding()
             .background(Color.black)
 
-            // MARK: - Image with TTS Highlight
+            // MARK: - Image with live highlights
             ZStack {
                 if let img = image {
                     GeometryReader { geo in
@@ -61,7 +59,7 @@ struct CameraReaderView: View {
                                             )
                                             .position(
                                                 x: box.rect.midX * geo.size.width,
-                                                y: (1 - box.rect.midY) * geo.size.height // flip Y
+                                                y: (1 - box.rect.midY) * geo.size.height // flip Vision Y
                                             )
                                             .animation(.easeInOut(duration: 0.12), value: tts.currentWordInSentence)
                                     }
@@ -80,32 +78,34 @@ struct CameraReaderView: View {
                     }
                 } else {
                     Spacer()
-                    Text("Capture or select an image to begin")
-                        .foregroundColor(.gray)
+                    Text("Select an image from your gallery")
+                        .foregroundColor(.white.opacity(0.6))
+                        .padding()
                     Spacer()
                 }
             }
 
-            // MARK: - Player Bar Only
+            // MARK: - Player Bar
             if !recognizedText.isEmpty {
                 Divider().background(Color.white.opacity(0.2))
-                TTSControlView(tts: tts, text: recognizedText)
+                FullPlayerView(tts: tts, text: recognizedText)
                     .background(Color.black)
             }
         }
         .background(Color.black.ignoresSafeArea())
-        .sheet(isPresented: $isShowingCamera) {
-            ImagePicker(source: .camera, selectedImage: $image) { img in
+        .sheet(isPresented: $isShowingImagePicker) {
+            ImagePicker(source: .photoLibrary, selectedImage: $image) { img in
                 processImage(img)
             }
         }
         .preferredColorScheme(.dark)
     }
 
-    // MARK: - Word Match Helper
+    // MARK: - Helper
     private func isCurrentWord(_ text: String) -> Bool {
-        tts.isSpeaking && text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-            == tts.currentWordInSentence.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        tts.isSpeaking &&
+        text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        == tts.currentWordInSentence.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     // MARK: - OCR
@@ -136,7 +136,7 @@ struct CameraReaderView: View {
                     recognizedText = combined
                     wordBoxes = boxes
 
-                    tts.prepareNewFileOnly(text: combined, url: tts.currentURL, title: tts.currentTitle ?? "Camera Capture")
+                    tts.prepareNewFileOnly(text: combined, url: tts.currentURL, title: tts.currentTitle ?? "Photo Reader")
                 }
             }
 
@@ -149,7 +149,7 @@ struct CameraReaderView: View {
         }
     }
 
-    // MARK: - Save Image Only
+    // MARK: - Save Image File (no text)
     private func saveImageToDisk() {
         guard let img = image else { return }
 
@@ -163,7 +163,7 @@ struct CameraReaderView: View {
                 try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             }
 
-            let name = "Scan-\(Int(Date().timeIntervalSince1970)).jpg"
+            let name = "Photo-\(Int(Date().timeIntervalSince1970)).jpg"
             let fileURL = dir.appendingPathComponent(name)
 
             if let data = img.jpegData(compressionQuality: 0.9) {

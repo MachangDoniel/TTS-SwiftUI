@@ -1,5 +1,5 @@
 //
-//  TTSControlView.swift
+//  FullPlayerView.swift
 //  TTS
 //
 //  Created by Doniel Tripura on 10/5/25.
@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct TTSControlView: View {
+struct FullPlayerView: View {
     @ObservedObject var tts: TTSPlayer
     @State private var showLanguagePicker = false
     let text: String
@@ -128,7 +128,7 @@ struct TTSControlView: View {
 }
 
 #Preview {
-    TTSControlView(
+    FullPlayerView(
         tts: TTSPlayer(),
         text: "Hello world. This is a test."
     )

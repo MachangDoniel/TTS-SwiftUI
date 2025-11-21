@@ -1,5 +1,5 @@
 //
-//  AuthInterceptor.swift
+//  ApiInterceptor.swift
 //  TTS
 //
 //  Created by Doniel Tripura on 10/20/25.
@@ -9,7 +9,7 @@ import Foundation
 import Alamofire
 
 // MARK: - Auth Interceptor Implementation
-final class AuthInterceptor: RequestInterceptor {
+final class ApiInterceptor: RequestInterceptor {
     
     // Weak reference to the global AuthViewModel
     private weak var authVM: AuthViewModel?

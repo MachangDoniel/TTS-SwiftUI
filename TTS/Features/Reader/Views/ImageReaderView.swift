@@ -121,7 +121,7 @@ struct ImageReaderView: View {
 
             if !recognizedText.isEmpty {
                 Divider().background(Color.white.opacity(0.2))
-                TTSControlView(tts: tts, text: recognizedText)
+                FullPlayerView(tts: tts, text: recognizedText)
                     .background(Color.black)
             }
         }

@@ -13,14 +13,14 @@ private weak var globalAuthVM: AuthViewModel? = nil
 
 func setGlobalAuthViewModel(_ vm: AuthViewModel) {
     globalAuthVM = vm
-    APIClient.shared.interceptor = AuthInterceptor(authVM: vm)
+    APIClient.shared.interceptor = ApiInterceptor(authVM: vm)
 }
 
 final class APIClient {
     static let shared = APIClient()
     
     // The interceptor is updated when setGlobalAuthViewModel is called
-    var interceptor: AuthInterceptor?
+    var interceptor: ApiInterceptor?
     
     private init() {}
     
