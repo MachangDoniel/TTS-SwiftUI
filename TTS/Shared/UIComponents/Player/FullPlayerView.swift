@@ -74,18 +74,45 @@ struct FullPlayerView: View {
                         tts.playFromCurrent()
                     case .playing, .paused:
                         tts.togglePlayPause()
+                    case .loading:
+                        break
                     }
                 }) {
                     ZStack {
+                        // Main round button
                         Circle()
                             .fill(Color.blue)
                             .frame(width: 70, height: 70)
+
+                        // Loader ring (layout-stable; rotates only while loading)
+                        ZStack {
+                            // Background track (always present to keep layout stable)
+                            Circle()
+                                .stroke(Color.white.opacity(0.12), lineWidth: 3)
+                                .frame(width: 76, height: 76)
+
+                            // Foreground arc — visible and rotating only when loading
+                            Circle()
+                                .trim(from: 0.0, to: 0.78)
+                                .stroke(Color.white.opacity(0.9), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                                .frame(width: 76, height: 76)
+                                .rotationEffect(.degrees(-90)) // start at top
+                                .rotationEffect(.degrees(tts.state == .loading ? 360 : 0))
+                                .animation(
+                                    tts.state == .loading
+                                    ? .linear(duration: 1.1).repeatForever(autoreverses: false)
+                                    : .default,
+                                    value: tts.state
+                                )
+                                .opacity(tts.state == .loading ? 1.0 : 0.0)
+                        }
+
                         Image(systemName: tts.state == .playing ? "pause.fill" : "play.fill")
                             .font(.system(size: 30, weight: .bold))
                             .foregroundColor(.white)
                     }
                 }
-                .disabled(tts.sentences.isEmpty)
+                .disabled(tts.state == .loading || tts.sentences.isEmpty)
                 .animation(.easeInOut(duration: 0.15), value: tts.state)
 
                 // Forward (next sentence)

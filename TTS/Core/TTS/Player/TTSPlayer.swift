@@ -212,6 +212,8 @@ extension TTSPlayer {
                     position = .init(sentenceIndex: 0, wordNSRange: nil, wordIndex: nil)
                     progress = 0.0
                     playFromCurrent()
+                case .loading:
+                    break
                 }
             }
         case .backend:
@@ -245,6 +247,8 @@ extension TTSPlayer {
                 position = .init(sentenceIndex: 0, wordNSRange: nil, wordIndex: nil)
                 progress = 0.0
                 startBackendFlow(resumeAt: currentIndex)
+            case .loading:
+                break
             }
         }
     }
@@ -407,6 +411,8 @@ extension TTSPlayer {
                 progress = 0.0
             }
             playFromCurrent()
+        case .loading:
+            break
         }
     }
 }
@@ -590,6 +596,8 @@ extension TTSPlayer {
                 progress = 0.0
             }
             startBackendFlow(resumeAt: currentIndex)
+        case .loading:
+            break
         }
     }
     

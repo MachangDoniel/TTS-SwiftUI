@@ -31,6 +31,8 @@ struct TabBarView: View {
     
     @StateObject private var recentStore = RecentStore()
     @EnvironmentObject var tts: TTSPlayer
+    
+    @State private var showBookmarkError = false
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -144,6 +146,7 @@ struct TabBarView: View {
                         Logger.log("Failed to create bookmark: \(error)")
                         // Even if bookmark fails, still try to open immediately with active access
                         resolvedURL = url
+                        showBookmarkError = true
                     }
                 }
                 // Navigate to the picked file immediately if available
@@ -174,6 +177,7 @@ struct TabBarView: View {
                     Logger.log("[TabBarView] Bookmark error (text): \(error.localizedDescription)")
                     // Fallback: still add without bookmark if it failed
                     recentStore.addExternal(fileURL: url, bookmarkData: Data(), kind: .files)
+                    showBookmarkError = true
                 }
                 // Restart TTS for this new file and pause (no auto-start)
                 tts.stop()
@@ -200,7 +204,11 @@ struct TabBarView: View {
                     Logger.log("Bookmark error (scan): \(error.localizedDescription)")
                     // Fallback: still add without bookmark if it failed
                     recentStore.addExternal(fileURL: url, bookmarkData: Data(), kind: .scan)
+                    showBookmarkError = true
                 }
+                // Open the saved image in FileViewer to unify the flow
+                selectedDocumentURL = url
+                selectedDocumentItem = IdentifiableURL(url: url)
             }
         }
         .sheet(isPresented: $showPhotoReader) {
@@ -215,7 +223,11 @@ struct TabBarView: View {
                     Logger.log("Bookmark error (photos): \(error.localizedDescription)")
                     // Fallback: still add without bookmark if it failed
                     recentStore.addExternal(fileURL: url, bookmarkData: Data(), kind: .photos)
+                    showBookmarkError = true
                 }
+                // Open the saved image in FileViewer to unify the flow
+                selectedDocumentURL = url
+                selectedDocumentItem = IdentifiableURL(url: url)
             }
         }
         .sheet(item: $webLinkItem) { item in
@@ -243,7 +255,11 @@ struct TabBarView: View {
                 }
             }
         }
-        
+        .alert("Could not save for recent files", isPresented: $showBookmarkError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("The image will open now but may not load later from Recents.")
+        }
         // Present FileViewer as fullScreenCover when a document is picked
         .fullScreenCover(item: $selectedDocumentItem) { item in
             AccessingFileViewer(url: item.url, tts: tts)

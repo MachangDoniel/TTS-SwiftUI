@@ -33,41 +33,15 @@ struct ImageReaderView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // MARK: - Compact Top Bar
-            HStack {
-                Button {
-                    // 👇 Collapse / Go Home (voice continues)
-                    dismiss()
-                } label: {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(.white)
-                        .padding(.vertical, 8)
-                }
-
-                Spacer()
-
-                HStack(spacing: 18) {
-                    Button {
-                        // placeholder for Aa (future text size)
-                    } label: {
-                        Image(systemName: "textformat.size")
-                            .font(.system(size: 18))
-                            .foregroundColor(.white)
-                    }
-
-                    Button {
-                        // placeholder for menu
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .font(.system(size: 18))
-                            .foregroundColor(.white)
-                    }
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 8)
-            .background(Color.black)
+            FileViewerHeader(
+                title: tts.currentTitle ?? "Image Reader",
+                isEditing: false,
+                onClose: { dismiss() },
+                onTextSettings: { /* placeholder for Aa */ },
+                onEdit: { /* no-op: ImageReaderView has no editor */ },
+                onSave: { /* no-op */ }
+            )
+            .frame(height: 60)
 
             // MARK: - Image + OCR Highlight
             if let img = croppedImage ?? image {
@@ -151,6 +125,7 @@ struct ImageReaderView: View {
     // MARK: - OCR
     private func processImage(_ img: UIImage) {
         isProcessing = true
+        DispatchQueue.main.async { tts.state = .loading }
         recognizedText = ""
         wordBoxes = []
 
@@ -173,11 +148,7 @@ struct ImageReaderView: View {
                     isProcessing = false
                     recognizedText = combined
                     wordBoxes = boxes
-
-                    // Prepare the recognized text as the current file (do not auto-start)
-                    tts.prepareNewFileOnly(text: combined, url: tts.currentURL, title: tts.currentTitle ?? "Image Reader")
-
-                    // ✅ Auto-save the cropped image after OCR
+                    tts.state = .paused
                     saveImageToDisk()
                 }
             }
@@ -214,6 +185,8 @@ struct ImageReaderView: View {
                 tts.currentTitle = name
                 tts.currentURL = fileURL
                 onSaved?(fileURL)
+                // Close the sheet; parent will open FileViewer for this URL
+                dismiss()
             }
         } catch {
             Logger.log("❌ Save failed: \(error.localizedDescription)")
@@ -324,3 +297,4 @@ struct OCRWordBox: Identifiable, Hashable {
     let text: String
     let rect: CGRect
 }
+

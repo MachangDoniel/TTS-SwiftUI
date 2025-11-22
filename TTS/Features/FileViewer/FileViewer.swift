@@ -93,23 +93,48 @@ struct FileViewer: View {
         // Always prepare the new file
         tts.currentTitle = fileURL.lastPathComponent
         self.editedText = ""
+        
         let ext = fileURL.pathExtension.lowercased()
-
+        let alreadyPreparedForThisURL = (tts.currentURL == fileURL) && !tts.sentences.isEmpty
+        
         switch ext {
         case "pdf":
-            let text = extractText(from: fileURL)
-            extractedText = text
-            editedText = text
-            // Prepare the new file (no auto-start)
-            tts.prepareNewFileOnly(text: text, url: fileURL, title: fileURL.lastPathComponent)
-
+            if !alreadyPreparedForThisURL {
+                tts.state = .loading
+                let text = extractText(from: fileURL)
+                extractedText = text
+                editedText = text
+                tts.prepareNewFileOnly(text: text, url: fileURL, title: fileURL.lastPathComponent)
+                tts.state = .paused
+            } else {
+                // Already prepared; do nothing to avoid fake loading
+            }
+            
         case "txt":
-            loadText() // prepare is gated inside loadText
+            if !alreadyPreparedForThisURL {
+                tts.state = .loading
+                loadText() // prepares inside loadText
+            } else {
+                loadText()
+                // Already prepared; do nothing
+            }
             self.isReadOnly = true
             
         default:
-            detectFileType()
-            // For images/others, OCR will trigger prepare if needed
+            // Images and others
+            if alreadyPreparedForThisURL {
+                // We’re already prepared for this file; avoid fake loading even if extractedText is empty due to view recreation
+                Logger.log("[FileViewer] Image already prepared for this URL; skipping detect/OCR.")
+            } else if extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                // Not prepared and no text yet → perform detect/OCR
+                tts.state = .loading
+                detectFileType() // loadImage -> OCR will set paused when done
+            } else {
+                // We have text but TTS not prepared for this URL → prepare and pause
+                tts.state = .loading
+                tts.prepareNewFileOnly(text: extractedText, url: fileURL, title: fileURL.lastPathComponent)
+                tts.state = .paused
+            }
         }
         
         // Monitor TTS state changes to ensure new file plays when user clicks play
@@ -168,7 +193,7 @@ struct FileViewer: View {
                         .onChange(of: editedText) { newValue in
                             hasUnsavedChanges = (newValue != extractedText)
                         }
-                        .onAppear { 
+                        .onAppear {
                             isTextEditorFocused = true
                             // Initialize editedText if empty
                             if editedText.isEmpty && !extractedText.isEmpty {
@@ -189,21 +214,7 @@ struct FileViewerTTSControlWrapper: View {
     
     var body: some View {
         FullPlayerView(tts: tts, text: text)
-            .onChange(of: tts.state) { newState in
-                // When state changes to playing, ensure it's playing the correct file
-                if newState == .playing {
-                    // If currentURL matches fileURL, we're good
-                    // If not, we need to stop and prepare the new file
-                    if let current = tts.currentURL, current != fileURL {
-                        // This shouldn't happen since we prepare in onAppear,
-                        // but just in case, stop and prepare the new file
-                        tts.stop()
-                        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            tts.prepareNewFileOnly(text: text, url: fileURL, title: fileURL.lastPathComponent)
-                        }
-                    }
-                }
-            }
+        // Removed .onChange(of: tts.state) to avoid unintended re-prepare when state flips to playing
     }
 }
 
@@ -329,7 +340,9 @@ extension FileViewer {
                     self.editedText = content
                     self.hasUnsavedChanges = false
                     self.isReadOnly = true  // Start in read-only mode
-                    if self.tts.currentURL != self.fileURL || self.tts.sentences.isEmpty {
+                    
+                    let alreadyPrepared = (self.tts.currentURL == self.fileURL) && !self.tts.sentences.isEmpty
+                    if !alreadyPrepared {
                         self.tts.prepareNewFileOnly(
                             text: content,
                             url: self.fileURL,
@@ -337,6 +350,7 @@ extension FileViewer {
                         )
                         self.tts.currentURL = self.fileURL
                     }
+                    self.tts.state = .paused  // Set ready state after content assigned
                 }
             } else {
                 DispatchQueue.main.async {
@@ -401,6 +415,7 @@ extension FileViewer {
         if let img = UIImage(contentsOfFile: fileURL.path) {
             uiImage = img
             isImage = true
+            // Leave tts.state as loading, OCR will update to paused on completion.
             performOCRIfNeeded()
         } else {
             extractedText = "⚠️ Unable to load image."
@@ -434,7 +449,10 @@ extension FileViewer {
             DispatchQueue.main.async {
                 self.extractedText = text.isEmpty ? "No text detected." : text
                 self.editedText = self.extractedText // Initialize editedText for editing
-                if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                self.tts.state = .paused  // Set ready state after OCR completes
+                
+                let alreadyPrepared = (self.tts.currentURL == self.fileURL) && !self.tts.sentences.isEmpty
+                if !alreadyPrepared && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     self.tts.prepareNewFileOnly(
                         text: text,
                         url: self.fileURL,

@@ -7,5 +7,5 @@
 
 
 enum TTSPlayerState {
-    case idle, playing, paused, finished
+    case idle, loading, playing, paused, finished
 }
