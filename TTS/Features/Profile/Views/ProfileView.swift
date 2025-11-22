@@ -140,9 +140,9 @@ struct ProfileView: View {
             Divider().background(Color.white.opacity(0.1))
             SettingsRow(title: "Share with Friends", action: { isShowingShareSheet = true })
             Divider().background(Color.white.opacity(0.1))
-            SettingsRow(title: "Privacy Policy", action: { openURL("https://example.com/privacy") })
+            SettingsRow(title: "Privacy Policy", action: { openURL("https://sites.google.com/view/privacy-policy-neuralsound-tts") })
             Divider().background(Color.white.opacity(0.1))
-            SettingsRow(title: "Terms of Use", action: { openURL("https://example.com/terms") })
+            SettingsRow(title: "Terms of Use", action: { openURL("https://sites.google.com/view/terms-of-use-neuralsound-tts") })
             Divider().background(Color.white.opacity(0.1))
             SettingsRow(title: "About", action: { navigateToAbout = true })
                 .background(
