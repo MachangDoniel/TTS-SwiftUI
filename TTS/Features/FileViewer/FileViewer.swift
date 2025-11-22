@@ -164,11 +164,17 @@ struct FileViewer: View {
                     } else if ["png", "jpg", "jpeg", "heic"].contains(fileURL.pathExtension.lowercased()) {
                         Group {
                             if let img = uiImage {
-                                Image(uiImage: img)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                    .onAppear { performOCRIfNeeded() }
+                                GeometryReader { geo in
+                                    ScrollView(.vertical, showsIndicators: true) {
+                                        Image(uiImage: img)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: geo.size.width)
+                                            .clipped()
+                                    }
+                                    .frame(width: geo.size.width, height: geo.size.height)
+                                }
+                                .onAppear { performOCRIfNeeded() }
                             } else {
                                 ProgressView("Loading image...")
                                     .foregroundColor(.white)
@@ -449,7 +455,7 @@ extension FileViewer {
             DispatchQueue.main.async {
                 self.extractedText = text.isEmpty ? "No text detected." : text
                 self.editedText = self.extractedText // Initialize editedText for editing
-                self.tts.state = .paused  // Set ready state after OCR completes
+//                self.tts.state = .paused  // Set ready state after OCR completes
                 
                 let alreadyPrepared = (self.tts.currentURL == self.fileURL) && !self.tts.sentences.isEmpty
                 if !alreadyPrepared && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

@@ -125,6 +125,19 @@ final class RecentStore: ObservableObject {
             let img = page.thumbnail(of: size, for: .cropBox)
             thumb = img.pngData()
         }
+        // Also handle image/photo files: png, jpg, jpeg, heic
+        else if ["png", "jpg", "jpeg", "heic"].contains(fileURL.pathExtension.lowercased()) {
+            // Load image from fileURL
+            if let image = UIImage(contentsOfFile: fileURL.path) {
+                // Generate 64x64 thumbnail using UIGraphicsImageRenderer
+                let size = CGSize(width: 64, height: 64)
+                let renderer = UIGraphicsImageRenderer(size: size)
+                let thumbnail = renderer.image { _ in
+                    image.draw(in: CGRect(origin: .zero, size: size))
+                }
+                thumb = thumbnail.pngData()
+            }
+        }
         let activity = RecentActivity(title: display,
                                       sourcePath: fileURL.isFileURL ? fileURL.path : fileURL.absoluteString,
                                       kind: kind,
@@ -140,6 +153,19 @@ final class RecentStore: ObservableObject {
             let size = CGSize(width: 64, height: 64)
             let img = page.thumbnail(of: size, for: .cropBox)
             thumb = img.pngData()
+        }
+        // Also handle image/photo files: png, jpg, jpeg, heic
+        else if ["png", "jpg", "jpeg", "heic"].contains(fileURL.pathExtension.lowercased()) {
+            // Load image from fileURL
+            if let image = UIImage(contentsOfFile: fileURL.path) {
+                // Generate 64x64 thumbnail using UIGraphicsImageRenderer
+                let size = CGSize(width: 64, height: 64)
+                let renderer = UIGraphicsImageRenderer(size: size)
+                let thumbnail = renderer.image { _ in
+                    image.draw(in: CGRect(origin: .zero, size: size))
+                }
+                thumb = thumbnail.pngData()
+            }
         }
         let activity = RecentActivity(title: display,
                                       sourcePath: fileURL.isFileURL ? fileURL.path : fileURL.absoluteString,
@@ -365,3 +391,4 @@ final class RecentStore: ObservableObject {
         }
     }
 }
+
