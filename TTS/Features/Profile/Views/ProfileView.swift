@@ -11,6 +11,8 @@ struct ProfileView: View {
     @State private var isShowingShareSheet = false
     @State private var navigateToAbout: Bool = false
     @State private var isShowingLogoutAlert = false
+    @State private var isShowingPrivacyPolicy = false
+    @State private var isShowingTermsOfUse = false
     
     var body: some View {
         NavigationStack {
@@ -36,6 +38,16 @@ struct ProfileView: View {
         }
         .sheet(isPresented: $isShowingShareSheet) {
             ShareSheet(activityItems: ["Check out this awesome app!"])
+        }
+        .sheet(isPresented: $isShowingPrivacyPolicy) {
+            if let privacyURL = URL(string: AppURLs.privacyPolicy.absoluteString) {
+                InAppBrowserView(url: privacyURL, title: "Privacy Policy")
+            }
+        }
+        .sheet(isPresented: $isShowingTermsOfUse) {
+            if let termsURL = URL(string: AppURLs.terms.absoluteString) {
+                InAppBrowserView(url: termsURL, title: "Terms of Use")
+            }
         }
         .loadingOverlay($authVM.isLoading)
     }
@@ -140,9 +152,9 @@ struct ProfileView: View {
             Divider().background(Color.white.opacity(0.1))
             SettingsRow(title: "Share with Friends", action: { isShowingShareSheet = true })
             Divider().background(Color.white.opacity(0.1))
-            SettingsRow(title: "Privacy Policy", action: { openURL("https://sites.google.com/view/privacy-policy-neuralsound-tts") })
+            SettingsRow(title: "Privacy Policy", action: { isShowingPrivacyPolicy = true })
             Divider().background(Color.white.opacity(0.1))
-            SettingsRow(title: "Terms of Use", action: { openURL("https://sites.google.com/view/terms-of-use-neuralsound-tts") })
+            SettingsRow(title: "Terms of Use", action: { isShowingTermsOfUse = true })
             Divider().background(Color.white.opacity(0.1))
             SettingsRow(title: "About", action: { navigateToAbout = true })
                 .background(
@@ -187,11 +199,6 @@ struct ProfileView: View {
     // MARK: - Helpers
     private func requestAppReview() {
         // TODO: Trigger SKStoreReviewController.requestReview(in:) where appropriate.
-    }
-    
-    private func openURL(_ urlString: String) {
-        guard let url = URL(string: urlString) else { return }
-        UIApplication.shared.open(url)
     }
 }
 
