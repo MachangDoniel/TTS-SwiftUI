@@ -6,28 +6,104 @@
 //
 
 import SwiftUI
+import Combine
 
 struct FullPlayerView: View {
     @ObservedObject var tts: TTSPlayer
     @State private var showLanguagePicker = false
+    @State private var showDownloadOptions = false
+    @State private var isDragging = false
+    @State private var dragValue: Double = 0.0
+    @StateObject private var downloader = UniversalAudioDownloader()
+    
     let text: String
+    let fileURL: URL?
+    let fileType: AudioFile.FileType?
+    
+    // Support legacy initializer
+    init(tts: TTSPlayer, text: String) {
+        self.tts = tts
+        self.text = text
+        self.fileURL = nil
+        self.fileType = nil
+    }
+    
+    // Enhanced initializer with file info for download
+    init(tts: TTSPlayer, text: String, fileURL: URL?, fileType: AudioFile.FileType?) {
+        self.tts = tts
+        self.text = text
+        self.fileURL = fileURL
+        self.fileType = fileType
+    }
 
     var body: some View {
         VStack(spacing: 16) {
 
-            // Progress bar across sentences
-            ProgressView(value: tts.progress)
-                .progressViewStyle(.linear)
-                .tint(.blue)
+            // Old progress bar (commented out - replaced with enhanced timeline)
+//             ProgressView(value: tts.progress)
+//                 .progressViewStyle(.linear)
+//                 .tint(.blue)
+//                 .padding(.horizontal)
+            
+            // Enhanced Timeline Slider (skinnier version)
+            VStack(spacing: 2) {
+//                Slider(
+//                    value: isDragging ? $dragValue : .constant(tts.currentTime),
+//                    in: 0...max(1, tts.totalDuration),
+//                    onEditingChanged: { editing in
+//                        if editing {
+//                            isDragging = true
+//                            dragValue = tts.currentTime
+//                        } else {
+//                            tts.seek(to: dragValue)
+//                            isDragging = false
+//                        }
+//                    }
+//                )
+                MySlider(
+                    value: isDragging ? $dragValue : Binding(
+                        get: { tts.currentTime },
+                        set: { dragValue = $0 }
+                    ),
+                    range: 0...max(1, tts.totalDuration),
+                    onEditingChanged: { editing in
+                        if editing {
+                            isDragging = true
+                            dragValue = tts.currentTime
+                        } else {
+                            tts.seek(to: dragValue)
+                            isDragging = false
+                        }
+                    }
+                )
+                .frame(height: 24)
                 .padding(.horizontal)
+                .disabled(!tts.isSeekable)
+                
+//                // Sentence progress indicators (skinnier)
+//                if !tts.sentences.isEmpty && tts.isSeekable {
+//                    GeometryReader { geometry in
+//                        HStack(spacing: 0) {
+//                            ForEach(0..<tts.sentences.count, id: \.self) { index in
+//                                Rectangle()
+//                                    .fill(index <= tts.currentIndex ? Color.blue : Color.gray.opacity(0.3))
+//                                    .frame(height: 1.5)
+//                                    .animation(.easeInOut(duration: 0.2), value: tts.currentIndex)
+//                            }
+//                        }
+//                    }
+//                    .frame(height: 1.5)
+//                    .padding(.horizontal)
+//                }
+            }
 
-            // Sentence counter
+            // Time display and sentence counter
             HStack {
-                Text("00:00")
+                Text(formatTime(tts.currentTime))
                 Spacer()
                 Text("\(tts.currentIndex + 1) of \(max(tts.sentences.count, 1))")
                 Spacer()
-                Text("00:01")
+                Text(formatTime(tts.totalDuration))
             }
             .font(.caption)
             .foregroundColor(.gray)
@@ -47,17 +123,18 @@ struct FullPlayerView: View {
                         .overlay(Circle().stroke(Color.white, lineWidth: 2))
                 }
 
-                // Back (previous sentence)
+                // Back (10-second skip backwards)
                 Button(action: {
-                    tts.previousSentence()
+                    tts.skipBackward(10.0)
                 }) {
                     VStack {
                         Image(systemName: "gobackward.10")
                             .font(.title2)
-                        Text("10")
+                        Text("10s")
                             .font(.caption2)
                     }
                 }
+                .disabled(!tts.hasActiveItem || !tts.isSeekable)
 
                 // Play / Pause
                 Button(action: {
@@ -115,23 +192,29 @@ struct FullPlayerView: View {
                 .disabled(tts.state == .loading || tts.sentences.isEmpty)
                 .animation(.easeInOut(duration: 0.15), value: tts.state)
 
-                // Forward (next sentence)
+                // Forward (10-second skip forward)
                 Button(action: {
-                    tts.nextSentence()
+                    tts.skipForward(10.0)
                 }) {
                     VStack {
                         Image(systemName: "goforward.10")
                             .font(.title2)
-                        Text("10")
+                        Text("10s")
                             .font(.caption2)
                     }
                 }
+                .disabled(!tts.hasActiveItem || !tts.isSeekable)
 
-                // Share (placeholder)
+                // Download / Share button
                 Button(action: {
-                    // TODO: share current text
+                    if let fileURL = fileURL, let fileType = fileType {
+                        showDownloadOptions = true
+                    } else {
+                        // Fallback to share for text input
+                        shareText()
+                    }
                 }) {
-                    Image(systemName: "square.and.arrow.up")
+                    Image(systemName: fileURL != nil ? "arrow.down.circle" : "square.and.arrow.up")
                         .font(.title2)
                 }
             }
@@ -151,13 +234,101 @@ struct FullPlayerView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $showDownloadOptions) {
+            if let fileURL = fileURL, let fileType = fileType {
+                VoiceDownloadOptionsView(
+                    content: FileContent(
+                        url: fileURL,
+                        text: text,
+                        type: fileType,
+                        title: fileURL.lastPathComponent
+                    ),
+                    downloader: downloader,
+                    tts: tts,
+                    isPresented: $showDownloadOptions
+                )
+            }
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func formatTime(_ time: TimeInterval) -> String {
+        let minutes = Int(time) / 60
+        let seconds = Int(time) % 60
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+    
+    private func shareText() {
+        // TODO: Implement text sharing functionality
+        let activityVC = UIActivityViewController(activityItems: [text], applicationActivities: nil)
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let rootViewController = windowScene.windows.first?.rootViewController {
+            rootViewController.present(activityVC, animated: true)
+        }
+    }
+}
+
+struct MySlider: View {
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let onEditingChanged: (Bool) -> Void
+
+    @State private var isDragging = false
+
+    var body: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            let progress = CGFloat((value - range.lowerBound) / (range.upperBound - range.lowerBound))
+            let thumbX = width * progress
+
+            ZStack(alignment: .leading) {
+
+                // Track background
+                Rectangle()
+                    .fill(Color.white.opacity(0.25))
+                    .frame(height: 3)
+                    .cornerRadius(2)
+
+                // Progress bar
+                Rectangle()
+                    .fill(Color.blue)
+                    .frame(width: thumbX, height: 3)
+                    .cornerRadius(2)
+
+                // Small thumb
+                Circle()
+                    .fill(Color.blue)
+                    .frame(width: 12, height: 12)     // 👈 Change size here
+                    .offset(x: thumbX - 6)            // center alignment
+                    .gesture(
+                        DragGesture()
+                            .onChanged { gesture in
+                                let location = min(max(0, gesture.location.x), width)
+                                let percent = location / width
+                                let newValue = range.lowerBound + Double(percent) * (range.upperBound - range.lowerBound)
+
+                                isDragging = true
+                                onEditingChanged(true)
+                                value = newValue
+                            }
+                            .onEnded { _ in
+                                isDragging = false
+                                onEditingChanged(false)
+                            }
+                    )
+            }
+        }
+        .frame(height: 24)
     }
 }
 
 #Preview {
     FullPlayerView(
         tts: TTSPlayer(),
-        text: "Hello world. This is a test."
+        text: "Hello world. This is a test.",
+        fileURL: URL(fileURLWithPath: "/tmp/test.txt"),
+        fileType: .text
     )
     .background(Color.black)
 }

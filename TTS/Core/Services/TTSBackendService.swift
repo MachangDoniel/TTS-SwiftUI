@@ -295,4 +295,8 @@ extension TTSBackendService {
         guard !sentences.isEmpty else { return false }
         return currentIndex < sentences.count - 1
     }
+    
+    func getCachedAudio(for order: Int) -> URL? {
+        return audioCache[order]
+    }
 }

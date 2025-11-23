@@ -219,8 +219,25 @@ struct FileViewerTTSControlWrapper: View {
     let fileURL: URL
     
     var body: some View {
-        FullPlayerView(tts: tts, text: text)
-        // Removed .onChange(of: tts.state) to avoid unintended re-prepare when state flips to playing
+        // Enhanced FullPlayerView with timeline and download capabilities
+        FullPlayerView(
+            tts: tts,
+            text: text,
+            fileURL: fileURL,
+            fileType: determineFileType(from: fileURL)
+        )
+    }
+    
+    private func determineFileType(from url: URL) -> AudioFile.FileType {
+        let ext = url.pathExtension.lowercased()
+        switch ext {
+        case "pdf":
+            return .pdf
+        case "png", "jpg", "jpeg", "heic":
+            return .image
+        default:
+            return .text
+        }
     }
 }
 

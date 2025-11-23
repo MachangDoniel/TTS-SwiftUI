@@ -39,6 +39,12 @@ final class TTSPlayer: NSObject, ObservableObject {
     @Published var appVoice: AppVoiceMode = .system
     @Published var selectedVoiceSampleId: String = "1"
     
+    // MARK: - Timeline Properties
+    @Published var currentTime: TimeInterval = 0.0
+    @Published var totalDuration: TimeInterval = 0.0
+    @Published var isSeekable: Bool = false
+    @Published var estimatedSentenceDurations: [TimeInterval] = []
+    
     // Tracks identity of the currently prepared content and the last content that actually started playback
     @Published var preparedContentId: String? = nil
     @Published var lastPlayedContentId: String? = nil
@@ -53,6 +59,11 @@ final class TTSPlayer: NSObject, ObservableObject {
     private let backendWorker = TTSBackendService()
     
     private var audioPlayer: AVAudioPlayer?
+    
+    // MARK: - Timeline Management
+    private var progressTimer: Timer?
+    private var sentenceStartTime: TimeInterval = 0.0
+    private var playbackStartTime: Date?
     
     // MARK: - Computed State
     var isSpeaking: Bool { state == .playing || state == .paused }
@@ -84,6 +95,10 @@ extension TTSPlayer {
         sentences = parser.splitIntoSentencesPreservingHeadings(trimmed)
         // Pre-tokenize all sentences into words for accurate tracking
         wordTokens = WordTokenizer.tokenizeSentences(sentences)
+        
+        // Estimate total duration for timeline
+        estimateTotalDuration()
+        
         currentIndex = 0
         currentSentenceText = sentences.first ?? ""
         currentWordInSentence = ""
@@ -94,6 +109,7 @@ extension TTSPlayer {
         currentURL = url
         currentTitle = title
         progress = 0.0
+        currentTime = 0.0
         state = .idle
         preparedContentId = makeContentId(text: trimmed, url: url, title: title)
     }
@@ -169,6 +185,12 @@ extension TTSPlayer {
         // Update currentSentenceText before playing
         currentSentenceText = sentences[currentIndex]
         lastPlayedContentId = preparedContentId
+        
+        // Start timeline tracking
+        playbackStartTime = Date()
+        sentenceStartTime = getSentenceStartTime(currentIndex)
+        startProgressTimer()
+        
         playCurrentSentence(resumeAt: currentIndex)
     }
     
@@ -259,6 +281,9 @@ extension TTSPlayer {
         audioPlayer = nil
         backendWorker.stopCurrent(player: self)
         backendWorker.cancelGenerationOnly(keepingAudio: true)
+        
+        stopProgressTimer()
+        
         // Preserve sentences and index so highlight and position remain
         currentWordInSentence = ""
         currentWordRange = nil
@@ -279,6 +304,9 @@ extension TTSPlayer {
         audioPlayer?.stop()
         audioPlayer = nil
         backendWorker.cancel()
+        
+        stopProgressTimer()
+        
         sentences.removeAll()
         wordTokens.removeAll()
         currentIndex = 0
@@ -548,6 +576,8 @@ extension TTSPlayer: AVSpeechSynthesizerDelegate {
             state = .playing
             playCurrentSentence(resumeAt: currentIndex)
         } else {
+            // Playback finished - stop the progress timer
+            stopProgressTimer()
             state = .finished
             position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
         }
@@ -555,6 +585,7 @@ extension TTSPlayer: AVSpeechSynthesizerDelegate {
     
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer,
                            didCancel utterance: AVSpeechUtterance) {
+        stopProgressTimer()
         currentWordInSentence = ""
         currentWordIndexInSentence = nil
         currentWordToken = nil
@@ -620,7 +651,208 @@ extension TTSPlayer {
 extension TTSPlayer: AVAudioPlayerDelegate {
     // MARK: - AVAudioPlayerDelegate
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        stopProgressTimer()
         backendWorker.handleAudioFinished(player: self)
+    }
+}
+
+// MARK: - Timeline Controls
+extension TTSPlayer {
+    
+    /// Skip forward by specified seconds (default 10 seconds)
+    func skipForward(_ seconds: TimeInterval = 10.0) {
+        guard !sentences.isEmpty else { return }
+        
+        switch appVoice {
+        case .system:
+            skipForwardSystem(seconds)
+        case .backend:
+            skipForwardBackend(seconds)
+        }
+    }
+    
+    /// Skip backward by specified seconds (default 10 seconds)
+    func skipBackward(_ seconds: TimeInterval = 10.0) {
+        guard !sentences.isEmpty else { return }
+        
+        switch appVoice {
+        case .system:
+            skipBackwardSystem(seconds)
+        case .backend:
+            skipBackwardBackend(seconds)
+        }
+    }
+    
+    /// Seek to specific time position
+    func seek(to time: TimeInterval) {
+        guard !sentences.isEmpty, time >= 0 else { return }
+        
+        // Find the sentence index for the target time
+        let targetIndex = findSentenceIndex(for: time)
+        guard targetIndex < sentences.count else { return }
+        
+        switch appVoice {
+        case .system:
+            seekSystemVoice(to: time, sentenceIndex: targetIndex)
+        case .backend:
+            seekBackendVoice(to: time, sentenceIndex: targetIndex)
+        }
+    }
+    
+    // MARK: - System Voice Timeline Methods
+    private func skipForwardSystem(_ seconds: TimeInterval) {
+        let currentElapsed = getCurrentElapsedTime()
+        let targetTime = currentElapsed + seconds
+        seek(to: targetTime)
+    }
+    
+    private func skipBackwardSystem(_ seconds: TimeInterval) {
+        let currentElapsed = getCurrentElapsedTime()
+        let targetTime = max(0, currentElapsed - seconds)
+        seek(to: targetTime)
+    }
+    
+    private func seekSystemVoice(to time: TimeInterval, sentenceIndex: Int) {
+        Task { @MainActor in
+            synthesizer.stopSpeaking(at: .immediate)
+            currentIndex = sentenceIndex
+            currentSentenceText = sentences[currentIndex]
+            currentWordInSentence = ""
+            currentWordRange = nil
+            currentWordIndexInSentence = nil
+            currentWordToken = nil
+            position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
+            
+            // Calculate progress within the sentence
+            let sentenceStartTime = getSentenceStartTime(sentenceIndex)
+            currentTime = sentenceStartTime
+            playbackStartTime = Date()
+            self.sentenceStartTime = sentenceStartTime
+            
+            progress = Double(currentIndex) / Double(max(1, sentences.count))
+            speakCurrentSentence_Apple()
+            startProgressTimer()
+        }
+    }
+    
+    // MARK: - Backend Voice Timeline Methods
+    private func skipForwardBackend(_ seconds: TimeInterval) {
+        guard let player = audioPlayer else { return }
+        let targetTime = player.currentTime + seconds
+        if targetTime < player.duration {
+            player.currentTime = targetTime
+            currentTime = getSentenceStartTime(currentIndex) + targetTime
+        } else {
+            // Skip to next sentence
+            nextSentence()
+        }
+    }
+    
+    private func skipBackwardBackend(_ seconds: TimeInterval) {
+        guard let player = audioPlayer else { return }
+        let targetTime = max(0, player.currentTime - seconds)
+        player.currentTime = targetTime
+        currentTime = getSentenceStartTime(currentIndex) + targetTime
+    }
+    
+    private func seekBackendVoice(to time: TimeInterval, sentenceIndex: Int) {
+        // For backend mode, switch to correct audio file
+        currentIndex = sentenceIndex
+        currentSentenceText = sentences[currentIndex]
+        currentWordInSentence = ""
+        currentWordRange = nil
+        currentWordIndexInSentence = nil
+        currentWordToken = nil
+        position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
+        progress = Double(currentIndex) / Double(max(1, sentences.count))
+        
+        // Start playing the sentence
+        playFromCurrent()
+    }
+    
+    // MARK: - Timeline Utilities
+    private func findSentenceIndex(for time: TimeInterval) -> Int {
+        guard !estimatedSentenceDurations.isEmpty else {
+            // Fallback: estimate based on equal distribution
+            let avgDuration = totalDuration / Double(sentences.count)
+            return min(Int(time / avgDuration), sentences.count - 1)
+        }
+        
+        var accumulatedTime: TimeInterval = 0
+        for (index, duration) in estimatedSentenceDurations.enumerated() {
+            if time <= accumulatedTime + duration {
+                return index
+            }
+            accumulatedTime += duration
+        }
+        return sentences.count - 1
+    }
+    
+    private func getSentenceStartTime(_ sentenceIndex: Int) -> TimeInterval {
+        guard !estimatedSentenceDurations.isEmpty, sentenceIndex < estimatedSentenceDurations.count else {
+            let avgDuration = totalDuration / Double(sentences.count)
+            return Double(sentenceIndex) * avgDuration
+        }
+        
+        return estimatedSentenceDurations.prefix(sentenceIndex).reduce(0, +)
+    }
+    
+    private func getCurrentElapsedTime() -> TimeInterval {
+        switch appVoice {
+        case .system:
+            guard let startTime = playbackStartTime else { return currentTime }
+            return sentenceStartTime + Date().timeIntervalSince(startTime)
+        case .backend:
+            if let player = audioPlayer {
+                return getSentenceStartTime(currentIndex) + player.currentTime
+            }
+            return currentTime
+        }
+    }
+    
+    func estimateTotalDuration() {
+        // Estimate duration based on text length and speech rate
+        let wordsPerMinute: Double = 150 // Average speaking rate
+        let totalWords = sentences.reduce(0) { sum, sentence in
+            sum + sentence.split(separator: " ").count
+        }
+        
+        totalDuration = (Double(totalWords) / wordsPerMinute) * 60.0
+        
+        // Estimate per-sentence durations
+        estimatedSentenceDurations = sentences.map { sentence in
+            let words = sentence.split(separator: " ").count
+            return (Double(words) / wordsPerMinute) * 60.0
+        }
+        
+        isSeekable = true
+    }
+    
+    private func startProgressTimer() {
+        stopProgressTimer()
+        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.updateCurrentTime()
+            }
+        }
+    }
+    
+    private func stopProgressTimer() {
+        progressTimer?.invalidate()
+        progressTimer = nil
+    }
+    
+    private func updateCurrentTime() {
+        switch appVoice {
+        case .system:
+            if let startTime = playbackStartTime {
+                currentTime = sentenceStartTime + Date().timeIntervalSince(startTime)
+            }
+        case .backend:
+            if let player = audioPlayer {
+                currentTime = getSentenceStartTime(currentIndex) + player.currentTime
+            }
+        }
     }
 }
 
