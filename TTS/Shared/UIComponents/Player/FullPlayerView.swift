@@ -35,31 +35,31 @@ struct FullPlayerView: View {
         self.fileURL = fileURL
         self.fileType = fileType
     }
-
+    
     var body: some View {
         VStack(spacing: 16) {
-
+            
             // Old progress bar (commented out - replaced with enhanced timeline)
-//             ProgressView(value: tts.progress)
-//                 .progressViewStyle(.linear)
-//                 .tint(.blue)
-//                 .padding(.horizontal)
+            //             ProgressView(value: tts.progress)
+            //                 .progressViewStyle(.linear)
+            //                 .tint(.blue)
+            //                 .padding(.horizontal)
             
             // Enhanced Timeline Slider (skinnier version)
             VStack(spacing: 2) {
-//                Slider(
-//                    value: isDragging ? $dragValue : .constant(tts.currentTime),
-//                    in: 0...max(1, tts.totalDuration),
-//                    onEditingChanged: { editing in
-//                        if editing {
-//                            isDragging = true
-//                            dragValue = tts.currentTime
-//                        } else {
-//                            tts.seek(to: dragValue)
-//                            isDragging = false
-//                        }
-//                    }
-//                )
+                //                Slider(
+                //                    value: isDragging ? $dragValue : .constant(tts.currentTime),
+                //                    in: 0...max(1, tts.totalDuration),
+                //                    onEditingChanged: { editing in
+                //                        if editing {
+                //                            isDragging = true
+                //                            dragValue = tts.currentTime
+                //                        } else {
+                //                            tts.seek(to: dragValue)
+                //                            isDragging = false
+                //                        }
+                //                    }
+                //                )
                 MySlider(
                     value: isDragging ? $dragValue : Binding(
                         get: { tts.currentTime },
@@ -80,23 +80,23 @@ struct FullPlayerView: View {
                 .padding(.horizontal)
                 .disabled(!tts.isSeekable)
                 
-//                // Sentence progress indicators (skinnier)
-//                if !tts.sentences.isEmpty && tts.isSeekable {
-//                    GeometryReader { geometry in
-//                        HStack(spacing: 0) {
-//                            ForEach(0..<tts.sentences.count, id: \.self) { index in
-//                                Rectangle()
-//                                    .fill(index <= tts.currentIndex ? Color.blue : Color.gray.opacity(0.3))
-//                                    .frame(height: 1.5)
-//                                    .animation(.easeInOut(duration: 0.2), value: tts.currentIndex)
-//                            }
-//                        }
-//                    }
-//                    .frame(height: 1.5)
-//                    .padding(.horizontal)
-//                }
+                //                // Sentence progress indicators (skinnier)
+                //                if !tts.sentences.isEmpty && tts.isSeekable {
+                //                    GeometryReader { geometry in
+                //                        HStack(spacing: 0) {
+                //                            ForEach(0..<tts.sentences.count, id: \.self) { index in
+                //                                Rectangle()
+                //                                    .fill(index <= tts.currentIndex ? Color.blue : Color.gray.opacity(0.3))
+                //                                    .frame(height: 1.5)
+                //                                    .animation(.easeInOut(duration: 0.2), value: tts.currentIndex)
+                //                            }
+                //                        }
+                //                    }
+                //                    .frame(height: 1.5)
+                //                    .padding(.horizontal)
+                //                }
             }
-
+            
             // Time display and sentence counter
             HStack {
                 Text(formatTime(tts.currentTime))
@@ -108,10 +108,10 @@ struct FullPlayerView: View {
             .font(.caption)
             .foregroundColor(.gray)
             .padding(.horizontal)
-
+            
             // Main controls
             HStack(spacing: 32) {
-
+                
                 // Language / Backend voice picker
                 Button(action: {
                     showLanguagePicker.toggle()
@@ -122,20 +122,20 @@ struct FullPlayerView: View {
                         .clipShape(Circle())
                         .overlay(Circle().stroke(Color.white, lineWidth: 2))
                 }
-
+                
                 // Back (10-second skip backwards)
                 Button(action: {
                     tts.skipBackward(10.0)
                 }) {
                     VStack {
-                        Image(systemName: "gobackward.10")
+                        Image(systemName: tts.appVoice == .system ? "chevron.backward.2" : "gobackward.10")
                             .font(.title2)
-                        Text("10s")
+                        Text(tts.appVoice == .system ? "Prev" : "10s")
                             .font(.caption2)
                     }
                 }
                 .disabled(!tts.hasActiveItem || !tts.isSeekable)
-
+                
                 // Play / Pause
                 Button(action: {
                     if tts.sentences.isEmpty {
@@ -145,7 +145,7 @@ struct FullPlayerView: View {
                             title: tts.currentTitle
                         )
                     }
-
+                    
                     switch tts.state {
                     case .idle, .finished:
                         tts.playFromCurrent()
@@ -160,14 +160,14 @@ struct FullPlayerView: View {
                         Circle()
                             .fill(Color.blue)
                             .frame(width: 70, height: 70)
-
+                        
                         // Loader ring (layout-stable; rotates only while loading)
                         ZStack {
                             // Background track (always present to keep layout stable)
                             Circle()
                                 .stroke(Color.white.opacity(0.12), lineWidth: 3)
                                 .frame(width: 76, height: 76)
-
+                            
                             // Foreground arc — visible and rotating only when loading
                             Circle()
                                 .trim(from: 0.0, to: 0.78)
@@ -183,7 +183,7 @@ struct FullPlayerView: View {
                                 )
                                 .opacity(tts.state == .loading ? 1.0 : 0.0)
                         }
-
+                        
                         Image(systemName: tts.state == .playing ? "pause.fill" : "play.fill")
                             .font(.system(size: 30, weight: .bold))
                             .foregroundColor(.white)
@@ -191,20 +191,20 @@ struct FullPlayerView: View {
                 }
                 .disabled(tts.state == .loading || tts.sentences.isEmpty)
                 .animation(.easeInOut(duration: 0.15), value: tts.state)
-
+                
                 // Forward (10-second skip forward)
                 Button(action: {
                     tts.skipForward(10.0)
                 }) {
                     VStack {
-                        Image(systemName: "goforward.10")
+                        Image(systemName: tts.appVoice == .system ? "chevron.forward.2" : "goforward.10")
                             .font(.title2)
-                        Text("10s")
+                        Text(tts.appVoice == .system ? "Next" : "10s")
                             .font(.caption2)
                     }
                 }
                 .disabled(!tts.hasActiveItem || !tts.isSeekable)
-
+                
                 // Download / Share button
                 Button(action: {
                     if let fileURL = fileURL, let fileType = fileType {
@@ -214,13 +214,13 @@ struct FullPlayerView: View {
                         shareText()
                     }
                 }) {
-                    Image(systemName: fileURL != nil ? "arrow.down.circle" : "square.and.arrow.up")
+                    Image(systemName: "square.and.arrow.up")
                         .font(.title2)
                 }
             }
             .padding(.horizontal)
             .foregroundColor(.white)
-
+            
         }
         .padding(.vertical)
         .background(Color(.systemGray6).opacity(0.15))
@@ -250,8 +250,9 @@ struct FullPlayerView: View {
             }
         }
     }
-    
-    // MARK: - Helper Methods
+}
+
+extension FullPlayerView {
     
     private func formatTime(_ time: TimeInterval) -> String {
         let minutes = Int(time) / 60

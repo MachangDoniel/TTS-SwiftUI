@@ -107,7 +107,7 @@ struct LanguagePickerView: View {
                                     Button {
                                         selectVoice(voice)
                                     } label: {
-                                        VoiceCard(voice: voice)
+                                        VoiceCard(voice: voice, isSelected: tts.selectedVoiceSampleId == voice.voiceSampleId)
                                     }
                                 }
                             }
@@ -263,3 +263,4 @@ struct LanguagePickerView: View {
         .environmentObject(TTSPlayer())
         .environmentObject(VoiceCatalog.shared)
 }
+

@@ -9,6 +9,7 @@ import SwiftUI
 
 struct VoiceCard: View {
     let voice: Voice
+    var isSelected: Bool = false
     
     var body: some View {
         HStack(spacing: 12) {
@@ -16,6 +17,17 @@ struct VoiceCard: View {
                 .resizable()
                 .frame(width: 50, height: 50)
                 .foregroundColor(.gray)
+                .overlay(
+                    Group {
+                        if isSelected {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                                .background(Color.black.opacity(0.7).clipShape(Circle()))
+                                .offset(x: 5, y: 5)
+                        }
+                    },
+                    alignment: .bottomTrailing
+                )
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(voice.name)
@@ -61,7 +73,8 @@ struct VoiceCard_Previews: PreviewProvider {
                         mood: "Calm",
                         type: "Premium",
                         voiceSampleId: "1"
-                    )
+                    ),
+                    isSelected: true
                 )
                 
                 VoiceCard(
@@ -72,11 +85,11 @@ struct VoiceCard_Previews: PreviewProvider {
                         mood: "Energetic",
                         type: "Standard",
                         voiceSampleId: "1"
-                    )
+                    ),
+                    isSelected: false
                 )
             }
         }
         .previewLayout(.sizeThatFits)
     }
 }
-
