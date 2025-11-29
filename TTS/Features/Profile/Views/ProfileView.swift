@@ -14,6 +14,9 @@ struct ProfileView: View {
     @State private var isShowingPrivacyPolicy = false
     @State private var isShowingTermsOfUse = false
     
+    @State private var showFeedbackPopup = false
+    @State private var feedbackTitle: String? = nil
+    
     var body: some View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
@@ -35,7 +38,37 @@ struct ProfileView: View {
             }
             .background(Color.black.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
+            .allowsHitTesting(!showFeedbackPopup)
         }
+        .overlay(
+            ZStack {
+                if showFeedbackPopup {
+                    Color.black.opacity(0.45)
+                        .ignoresSafeArea(.container, edges: .all)
+                        .ignoresSafeArea(.keyboard) // allow dim to extend under keyboard
+                        .contentShape(Rectangle()) // ensure it receives taps everywhere
+                        .transition(.opacity)
+                        .onTapGesture { showFeedbackPopup = false }
+
+                    // Centered popup with slight offset for keyboard avoidance
+                    FeedbackPopup(
+                        isPresented: $showFeedbackPopup,
+                        title: feedbackTitle ?? "",
+                        onSubmit: { text in
+                            Logger.log("User wrote: \(text)")
+                            showFeedbackPopup = false
+                        }
+                    )
+                    .padding(.horizontal, 24)
+                    .zIndex(1)
+                    .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: showFeedbackPopup)
+            .zIndex(10)
+            .ignoresSafeArea(.keyboard)
+        )
+//        .disabled(showFeedbackPopup)
         .sheet(isPresented: $isShowingShareSheet) {
             ShareSheet(activityItems: ["Check out this awesome app!"])
         }
@@ -146,12 +179,20 @@ struct ProfileView: View {
     // MARK: - Settings Section
     private var settingsSection: some View {
         VStack(spacing: 0) {
-            SettingsRow(title: "Send Feedbacks", action: { isShowingMailView = true })
+            SettingsRow(title: "Send Feedbacks", action: {
+                feedbackTitle = "Send Feedback"
+                showFeedbackPopup = true
+            })
             Divider().background(Color.white.opacity(0.1))
-            SettingsRow(title: "Review on the App Store", action: { requestAppReview() })
+            SettingsRow(title: "Request for Feature", action: {
+                feedbackTitle = "Request Feature"
+                showFeedbackPopup = true
+            })
             Divider().background(Color.white.opacity(0.1))
-            SettingsRow(title: "Share with Friends", action: { isShowingShareSheet = true })
-            Divider().background(Color.white.opacity(0.1))
+//            SettingsRow(title: "Review on the App Store", action: { requestAppReview() })
+//            Divider().background(Color.white.opacity(0.1))
+//            SettingsRow(title: "Share with Friends", action: { isShowingShareSheet = true })
+//            Divider().background(Color.white.opacity(0.1))
             SettingsRow(title: "Privacy Policy", action: { isShowingPrivacyPolicy = true })
             Divider().background(Color.white.opacity(0.1))
             SettingsRow(title: "Terms of Use", action: { isShowingTermsOfUse = true })
@@ -256,3 +297,4 @@ private extension View {
     }
     .preferredColorScheme(.dark)
 }
+

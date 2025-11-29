@@ -35,7 +35,7 @@ struct PhotoReaderView: View {
                     Button("Save File") {
                         saveImageToDisk()
                     }
-                    .foregroundColor(.blue)
+                    .foregroundColor(.myPrimaryColor)
                 }
             }
             .padding()
@@ -52,7 +52,7 @@ struct PhotoReaderView: View {
                                 ForEach(wordBoxes, id: \.id) { box in
                                     if isCurrentWord(box.text) {
                                         Rectangle()
-                                            .fill(Color.blue.opacity(0.35))
+                                            .fill(Color.myPrimaryColor.opacity(0.35))
                                             .frame(
                                                 width: box.rect.width * geo.size.width,
                                                 height: box.rect.height * geo.size.height
@@ -71,7 +71,7 @@ struct PhotoReaderView: View {
                     .overlay {
                         if isProcessing {
                             ProgressView("Reading...")
-                                .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                                .progressViewStyle(CircularProgressViewStyle(tint: .myPrimaryColor))
                                 .foregroundColor(.white)
                                 .background(Color.black.opacity(0.5))
                         }

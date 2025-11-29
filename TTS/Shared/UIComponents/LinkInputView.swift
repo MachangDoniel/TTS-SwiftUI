@@ -67,7 +67,7 @@ struct LinkInputView: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.blue)
+                    .background(Color.myPrimaryColor)
                     .cornerRadius(12)
                     .padding(.horizontal, 24)
                     .padding(.bottom, 40)

@@ -42,7 +42,7 @@ struct FullPlayerView: View {
             // Old progress bar (commented out - replaced with enhanced timeline)
             //             ProgressView(value: tts.progress)
             //                 .progressViewStyle(.linear)
-            //                 .tint(.blue)
+            //                 .tint(.myPrimaryColor)
             //                 .padding(.horizontal)
             
             // Enhanced Timeline Slider (skinnier version)
@@ -86,7 +86,7 @@ struct FullPlayerView: View {
                 //                        HStack(spacing: 0) {
                 //                            ForEach(0..<tts.sentences.count, id: \.self) { index in
                 //                                Rectangle()
-                //                                    .fill(index <= tts.currentIndex ? Color.blue : Color.gray.opacity(0.3))
+                //                                    .fill(index <= tts.currentIndex ? Color.myPrimaryColor : Color.gray.opacity(0.3))
                 //                                    .frame(height: 1.5)
                 //                                    .animation(.easeInOut(duration: 0.2), value: tts.currentIndex)
                 //                            }
@@ -158,7 +158,7 @@ struct FullPlayerView: View {
                     ZStack {
                         // Main round button
                         Circle()
-                            .fill(Color.blue)
+                            .fill(Color.myPrimaryColor)
                             .frame(width: 70, height: 70)
                         
                         // Loader ring (layout-stable; rotates only while loading)
@@ -293,13 +293,13 @@ struct MySlider: View {
 
                 // Progress bar
                 Rectangle()
-                    .fill(Color.blue)
+                    .fill(Color.myPrimaryColor)
                     .frame(width: thumbX, height: 3)
                     .cornerRadius(2)
 
                 // Small thumb
                 Circle()
-                    .fill(Color.blue)
+                    .fill(Color.myPrimaryColor)
                     .frame(width: 12, height: 12)     // 👈 Change size here
                     .offset(x: thumbX - 6)            // center alignment
                     .gesture(

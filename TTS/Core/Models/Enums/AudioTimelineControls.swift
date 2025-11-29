@@ -113,7 +113,7 @@ struct TimelineSlider: View {
                     }
                 }
             )
-            .accentColor(.blue)
+            .accentColor(.myPrimaryColor)
             .disabled(!tts.isSeekable)
             
             // Progress indicators (sentences)
@@ -122,7 +122,7 @@ struct TimelineSlider: View {
                     HStack(spacing: 0) {
                         ForEach(0..<tts.sentences.count, id: \.self) { index in
                             Rectangle()
-                                .fill(index <= tts.currentIndex ? Color.blue : Color.gray.opacity(0.3))
+                                .fill(index <= tts.currentIndex ? Color.myPrimaryColor : Color.gray.opacity(0.3))
                                 .frame(height: 2)
                                 .animation(.easeInOut(duration: 0.2), value: tts.currentIndex)
                         }
@@ -196,11 +196,11 @@ struct AudioDownloadButton: View {
     private var downloadBackgroundColor: Color {
         switch downloadState {
         case .notStarted:
-            return .blue.opacity(0.7)
+            return .myPrimaryColor.opacity(0.7)
         case .queued:
             return .orange.opacity(0.7)
         case .downloading:
-            return .blue.opacity(0.9)
+            return .myPrimaryColor.opacity(0.9)
         case .completed:
             return .green.opacity(0.7)
         case .failed:
@@ -267,7 +267,7 @@ struct VoiceDownloadOptionsView: View {
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
-                .background(Color.blue)
+                .background(Color.myPrimaryColor)
                 .cornerRadius(8)
             }
             .padding()

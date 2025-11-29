@@ -51,10 +51,10 @@ struct VoiceCard: View {
             
             Text(voice.type)
                 .font(.caption)
-                .foregroundColor(voice.type == "Premium" ? .yellow : .green)
+                .foregroundColor(voice.type == VoiceType.Premium.rawValue ? .yellow : .green)
         }
         .padding()
-        .background(Color(.systemGray6).opacity(0.15))
+        .background(isSelected ? Color(red: 65/255, green: 91/255, blue: 246/255).opacity(0.17) : Color(.systemGray6).opacity(0.15))
         .cornerRadius(12)
         .padding(.horizontal)
     }
@@ -93,3 +93,4 @@ struct VoiceCard_Previews: PreviewProvider {
         .previewLayout(.sizeThatFits)
     }
 }
+

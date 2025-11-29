@@ -34,7 +34,7 @@ struct TextInputView: View {
                     Button("Save File") {
                         saveAndConvertToReadOnly()
                     }
-                    .foregroundColor(.blue)
+                    .foregroundColor(.myPrimaryColor)
                 }
                 .padding()
                 .background(Color.black)

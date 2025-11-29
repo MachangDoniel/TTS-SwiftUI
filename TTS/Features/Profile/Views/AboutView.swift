@@ -25,17 +25,17 @@ struct AboutView: View {
                         )
                     
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Thor AI")
+                        Text("TTS")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(.white)
-                        Text("Version: 1.6(4)")
+                        Text("Version: \(displayVersion)")
                             .font(.system(size: 14))
                             .foregroundColor(.white.opacity(0.7))
                         HStack(spacing: 4) {
                             Text("Developed by:")
                                 .font(.system(size: 14))
                                 .foregroundColor(.white.opacity(0.5))
-                            Text("Text to Speech")
+                            Text("Neural Sound")
                                 .font(.system(size: 14))
                                 .foregroundColor(.white.opacity(0.9))
                         }
@@ -57,17 +57,29 @@ struct AboutView: View {
                             Text("Email:")
                                 .font(.system(size: 14, weight: .regular))
                                 .foregroundColor(.white.opacity(0.6))
-                            Text("Relax AI")
-                                .font(.system(size: 14))
-                                .foregroundColor(.white.opacity(0.9))
+                            if let emailURL = URL(string: "mailto:\(AppURLs.support)") {
+                                Link(AppURLs.support.absoluteString, destination: emailURL)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.white.opacity(0.9))
+                            } else {
+                                Text(AppURLs.support.absoluteString)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.white.opacity(0.9))
+                            }
                         }
                         HStack {
                             Text("Website:")
                                 .font(.system(size: 14, weight: .regular))
                                 .foregroundColor(.white.opacity(0.6))
-                            Text("Relax AI")
-                                .font(.system(size: 14))
-                                .foregroundColor(.white.opacity(0.9))
+                            if let url = URL(string: AppURLs.website.absoluteString) {
+                                Link(AppURLs.website.absoluteString, destination: url)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.white.opacity(0.9))
+                            } else {
+                                Text(AppURLs.website.absoluteString)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.white.opacity(0.9))
+                            }
                         }
                     }
                 }
@@ -102,6 +114,22 @@ struct AboutView: View {
         .background(Color.black.ignoresSafeArea())
         .navigationTitle("About")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+extension AboutView {
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+    }
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
+    }
+    private var displayVersion: String {
+        #if DEBUG
+        return buildNumber.isEmpty ? appVersion : "\(appVersion)(\(buildNumber))"
+        #else
+        return appVersion
+        #endif
     }
 }
 

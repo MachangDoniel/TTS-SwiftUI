@@ -84,19 +84,22 @@ struct HomeView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
 
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 4), spacing: 16) {
-                // If you have a picked file URL, call recentStore.add(fileURL: url, kind: .files)
-                InputSourceTile(icon: "File", title: "Files", action: { onPickFiles?() })
-                InputSourceTile(icon: "GDrive", title: "GDrive", tint: .green, action: { onPickGDrive?() })
-                InputSourceTile(icon: "photo.fill.on.rectangle.fill", title: "Photo", tint: .yellow, action: { onPickPhotos?() })
-                InputSourceTile(icon: "Camera", title: "Scan", action: { onScan?() })
-                InputSourceTile(icon: "Dbox", title: "Dbox", tint: .blue, action: { onPickDropbox?() })
-                InputSourceTile(icon: "Book", title: "Book", action: { onPickBook?() })
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4), spacing: 10) {
+                // If pick file URL, call recentStore.add(fileURL: url, kind: .files)
                 InputSourceTile(icon: "Text", title: "Type", action: { onTypeText?() })
+                InputSourceTile(icon: "Camera", title: "Scan", action: { onScan?() })
+                InputSourceTile(icon: "photo.fill.on.rectangle.fill", title: "Photo", tint: .yellow, action: { onPickPhotos?() })
+                InputSourceTile(icon: "File", title: "Files", action: { onPickFiles?() })
                 InputSourceTile(icon: "Link", title: "Link", action: { onPasteLink?() })
+
+                InputSourceTile(icon: "GDrive", title: "GDrive", tint: .green, status: .comingSoon, action: { onPickGDrive?() })
+                InputSourceTile(icon: "Dbox", title: "Dbox", tint: .blue, status: .comingSoon, action: { onPickDropbox?() })
+                InputSourceTile(icon: "Book", title: "Book", status: .comingSoon, action: { onPickBook?() })
+                
+                
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 20)
+            .padding(.horizontal, 10)
+            .padding(.bottom, 10)
         }
         .background(Color(red: 0.10, green: 0.10, blue: 0.11))
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))

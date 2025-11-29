@@ -9,20 +9,37 @@
 import SwiftUI
 
 extension Color {
-    // Generic hex initializer
-    init(hex: String) {
-        var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-        hexSanitized = hexSanitized.replacingOccurrences(of: "#", with: "")
+    static let myPrimaryColor = Color(red: 67/255, green: 90/255, blue: 246/255)
+}
 
-        var rgb: UInt64 = 0
-        Scanner(string: hexSanitized).scanHexInt64(&rgb)
+extension ShapeStyle where Self == Color {
+    static var myPrimaryColor: Color { Color.myPrimaryColor }
+}
 
-        let r = Double((rgb >> 16) & 0xFF) / 255.0
-        let g = Double((rgb >> 8) & 0xFF) / 255.0
-        let b = Double(rgb & 0xFF) / 255.0
+extension Color {
+    init(hex: String, opacity: Double? = 1.0) {
+        var hexString = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if hexString.hasPrefix("#") { hexString.removeFirst() }
 
-        self.init(red: r, green: g, blue: b)
+        var int: UInt64 = 0
+        Scanner(string: hexString).scanHexInt64(&int)
+
+        let r, g, b, a: Double
+        switch hexString.count {
+        case 6:
+            r = Double((int >> 16) & 0xFF) / 255.0
+            g = Double((int >> 8) & 0xFF) / 255.0
+            b = Double(int & 0xFF) / 255.0
+            a = opacity ?? 0
+        case 8:
+            r = Double((int >> 24) & 0xFF) / 255.0
+            g = Double((int >> 16) & 0xFF) / 255.0
+            b = Double((int >> 8) & 0xFF) / 255.0
+            a = Double(int & 0xFF) / 255.0
+        default:
+            r = 0; g = 0; b = 0; a = opacity ?? 00
+        }
+
+        self.init(.sRGB, red: r, green: g, blue: b, opacity: a)
     }
-    
-    static let customBlue = Color(hex: "#4F56F6")
 }

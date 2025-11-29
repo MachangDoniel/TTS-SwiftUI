@@ -25,7 +25,7 @@ struct FilterBar: View {
                             .padding(.horizontal, 14)
                             .background(
                                 selected == filter ?
-                                Color.blue.opacity(0.9) :
+                                Color.myPrimaryColor.opacity(0.9) :
                                 Color.white.opacity(0.1)
                             )
                             .clipShape(Capsule())

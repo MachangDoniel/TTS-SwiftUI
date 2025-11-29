@@ -21,7 +21,7 @@ struct LoginView: View {
             VStack(spacing: 8) {
                 Image(systemName: "person.crop.circle.fill")
                     .font(.system(size: 64))
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(.myPrimaryColor)
                     .symbolRenderingMode(.hierarchical)
                     .padding(.bottom, 4)
                 Text("Welcome")
