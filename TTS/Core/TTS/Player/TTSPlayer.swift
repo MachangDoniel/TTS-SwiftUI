@@ -61,10 +61,14 @@ final class TTSPlayer: NSObject, ObservableObject {
     
     private var audioPlayer: AVAudioPlayer?
     
+    // MARK: - Utterance Tracking
+    private var currentUtterance: AVSpeechUtterance?
+    
     // MARK: - Timeline Management
     private var progressTimer: Timer?
     private var sentenceStartTime: TimeInterval = 0.0
     private var playbackStartTime: Date?
+    private var skipTask: Task<Void, Never>?
     
     // MARK: - Computed State
     var isSpeaking: Bool { state == .playing || state == .paused }
@@ -223,6 +227,21 @@ extension TTSPlayer {
                     playFromCurrent()
                     return
                 }
+                
+                // Special case: if at end (index == sentences.count), restart from beginning
+                if currentIndex == sentences.count {
+                    currentIndex = 0
+                    currentSentenceText = sentences.first ?? ""
+                    currentWordInSentence = ""
+                    currentWordRange = nil
+                    currentWordIndexInSentence = nil
+                    currentWordToken = nil
+                    position = .init(sentenceIndex: 0, wordNSRange: nil, wordIndex: nil)
+                    progress = 0.0
+                    playFromCurrent()
+                    return
+                }
+                
                 switch state {
                 case .playing:
                     synthesizer.pauseSpeaking(at: .immediate)
@@ -258,6 +277,21 @@ extension TTSPlayer {
                 startBackendFlow(resumeAt: currentIndex)
                 return
             }
+            
+            // Special case: if at end (index == sentences.count), restart from beginning
+            if currentIndex == sentences.count {
+                currentIndex = 0
+                currentSentenceText = sentences.first ?? ""
+                currentWordInSentence = ""
+                currentWordRange = nil
+                currentWordIndexInSentence = nil
+                currentWordToken = nil
+                position = .init(sentenceIndex: 0, wordNSRange: nil, wordIndex: nil)
+                progress = 0.0
+                startBackendFlow(resumeAt: currentIndex)
+                return
+            }
+            
             switch state {
             case .playing:
                 backendWorker.pause()
@@ -282,7 +316,12 @@ extension TTSPlayer {
     }
     
     func stop() {
+        // Cancel any pending skip operations
+        skipTask?.cancel()
+        skipTask = nil
+        
         synthesizer.stopSpeaking(at: .immediate)
+        currentUtterance = nil
         audioPlayer?.stop()
         audioPlayer = nil
         backendWorker.stopCurrent(player: self)
@@ -302,7 +341,12 @@ extension TTSPlayer {
     
     func resetSession() {
         // Fully clear all state (use when switching files)
+        // Cancel any pending skip operations
+        skipTask?.cancel()
+        skipTask = nil
+        
         synthesizer.stopSpeaking(at: .immediate)
+        currentUtterance = nil
         synthesizer.delegate = nil
         synthesizer = AVSpeechSynthesizer()
         synthesizer.delegate = self
@@ -331,24 +375,57 @@ extension TTSPlayer {
     }
     
     func nextSentence() {
-        guard !sentences.isEmpty, currentIndex < sentences.count - 1 else { return }
+        guard !sentences.isEmpty else { return }
+        // If at end (index == sentences.count), do nothing
+        guard currentIndex < sentences.count - 1 else { return }
         switch appVoice {
         case .system:
+            // Cancel any existing skip operation to prevent race conditions
+            skipTask?.cancel()
+            
             // Ensured MainActor for smooth UI updates (free mode)
-            Task { @MainActor in
-                synthesizer.stopSpeaking(at: .immediate)
+            skipTask = Task { @MainActor in
+                // Capture currentIndex at the start before any delay to prevent race conditions
                 let nextIndex = min(currentIndex + 1, sentences.count - 1)
+                
+                // Check if task was cancelled before proceeding
+                guard !Task.isCancelled else { return }
+                
+                // Step 1: Pause first (button shows pause, highlight syncs)
+                state = .paused
+                
+                // Step 2: Stop current speech and clear utterance tracking
+                synthesizer.stopSpeaking(at: .immediate)
+                currentUtterance = nil
+                
+                // Step 3: Wait briefly for stop to complete (prevents race condition)
+                try? await Task.sleep(nanoseconds: 50_000_000) // 50ms delay
+                
+                // Check again if task was cancelled during sleep
+                guard !Task.isCancelled else { return }
+                
+                // Step 4: Update to next sentence using captured index
                 currentIndex = nextIndex
-                // Sync highlight text to new sentence after index change
                 currentSentenceText = sentences[currentIndex]
                 currentWordInSentence = ""
                 currentWordRange = nil
                 currentWordIndexInSentence = nil
                 currentWordToken = nil
                 position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
-                state = .playing
                 progress = Double(currentIndex) / Double(max(1, sentences.count))
+                
+                // Update timeline tracking for the new sentence
+                playbackStartTime = Date()
+                sentenceStartTime = getSentenceStartTime(currentIndex)
+                currentTime = sentenceStartTime
+                startProgressTimer()
+                
+                // Step 5: Resume playing (button shows play, voice active, highlight active)
+                state = .playing
                 speakCurrentSentence_Apple()
+                
+                // Clear the task reference when done
+                skipTask = nil
             }
         case .backend:
             backendWorker.stopCurrent(player: self)
@@ -367,24 +444,79 @@ extension TTSPlayer {
     }
     
     func previousSentence() {
-        guard !sentences.isEmpty, currentIndex > 0 else { return }
+        guard !sentences.isEmpty else { return }
+        
+        // Special case: if at end (index == sentences.count), go to last sentence
+        if currentIndex == sentences.count {
+            currentIndex = sentences.count - 1
+            currentSentenceText = sentences[currentIndex]
+            currentWordInSentence = ""
+            currentWordRange = nil
+            currentWordIndexInSentence = nil
+            currentWordToken = nil
+            position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
+            progress = Double(currentIndex) / Double(max(1, sentences.count))
+            
+            // Update timeline tracking
+            playbackStartTime = Date()
+            sentenceStartTime = getSentenceStartTime(currentIndex)
+            currentTime = sentenceStartTime
+            startProgressTimer()
+            
+            state = .playing
+            playCurrentSentence(resumeAt: currentIndex)
+            return
+        }
+        
+        guard currentIndex > 0 else { return }
         switch appVoice {
         case .system:
+            // Cancel any existing skip operation to prevent race conditions
+            skipTask?.cancel()
+            
             // Ensured MainActor for smooth UI updates (free mode)
-            Task { @MainActor in
-                synthesizer.stopSpeaking(at: .immediate)
+            skipTask = Task { @MainActor in
+                // Capture currentIndex at the start before any delay to prevent race conditions
                 let prevIndex = max(currentIndex - 1, 0)
+                
+                // Check if task was cancelled before proceeding
+                guard !Task.isCancelled else { return }
+                
+                // Step 1: Pause first (button shows pause, highlight syncs)
+                state = .paused
+                
+                // Step 2: Stop current speech and clear utterance tracking
+                synthesizer.stopSpeaking(at: .immediate)
+                currentUtterance = nil
+                
+                // Step 3: Wait briefly for stop to complete (prevents race condition)
+                try? await Task.sleep(nanoseconds: 50_000_000) // 50ms delay
+                
+                // Check again if task was cancelled during sleep
+                guard !Task.isCancelled else { return }
+                
+                // Step 4: Update to previous sentence using captured index
                 currentIndex = prevIndex
-                // Sync highlight text to new sentence after index change
                 currentSentenceText = sentences[currentIndex]
                 currentWordInSentence = ""
                 currentWordRange = nil
                 currentWordIndexInSentence = nil
                 currentWordToken = nil
                 position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
-                state = .playing
                 progress = Double(currentIndex) / Double(max(1, sentences.count))
+                
+                // Update timeline tracking for the new sentence
+                playbackStartTime = Date()
+                sentenceStartTime = getSentenceStartTime(currentIndex)
+                currentTime = sentenceStartTime
+                startProgressTimer()
+                
+                // Step 5: Resume playing (button shows play, voice active, highlight active)
+                state = .playing
                 speakCurrentSentence_Apple()
+                
+                // Clear the task reference when done
+                skipTask = nil
             }
         case .backend:
             backendWorker.stopCurrent(player: self)
@@ -420,6 +552,10 @@ extension TTSPlayer {
             utterance.voice = AVSpeechSynthesisVoice(language: config.language)
         }
         utterance.rate = config.rate
+        
+        // Track this utterance as the current one for validation in delegate callbacks
+        currentUtterance = utterance
+        
         synthesizer.speak(utterance)
         Logger.log("🔊 [Apple] Reading sentence \(currentIndex + 1)/\(sentences.count)")
     }
@@ -516,6 +652,15 @@ extension TTSPlayer: AVSpeechSynthesizerDelegate {
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer,
                            willSpeakRangeOfSpeechString range: NSRange,
                            utterance: AVSpeechUtterance) {
+        // Ensure we're processing the correct utterance for the current sentence
+        // This prevents stale delegate callbacks from old utterances after skipping
+        guard currentIndex < sentences.count else { return }
+        let currentSentence = sentences[currentIndex].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard utterance.speechString == currentSentence else {
+            // This is a callback for an old utterance that's being cancelled
+            return
+        }
+        
         // Use pre-tokenized word tokens for accurate word matching
         guard currentIndex < wordTokens.count else {
             // Fallback to old method if tokens not available
@@ -547,6 +692,21 @@ extension TTSPlayer: AVSpeechSynthesizerDelegate {
     
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer,
                            didFinish utterance: AVSpeechUtterance) {
+        // Two-layer validation to prevent stale callbacks from causing desync
+        // Layer 1: Identity check - is this the utterance we're currently tracking?
+        guard utterance === currentUtterance else {
+            // This is a callback from an old utterance that was cancelled
+            return
+        }
+        
+        // Layer 2: Content validation - does the utterance match current sentence?
+        guard currentIndex < sentences.count else { return }
+        let currentSentence = sentences[currentIndex].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard utterance.speechString == currentSentence else {
+            // Utterance doesn't match current sentence, ignore it
+            return
+        }
+        
         currentWordInSentence = ""
         currentWordIndexInSentence = nil
         currentWordToken = nil
@@ -568,10 +728,13 @@ extension TTSPlayer: AVSpeechSynthesizerDelegate {
             state = .playing
             playCurrentSentence(resumeAt: currentIndex)
         } else {
-            // Playback finished - stop the progress timer
+            // Finished last sentence - pause at end (not restart)
             stopProgressTimer()
-            state = .finished
+            currentIndex = sentences.count // Set to invalid index to represent "at end"
+            currentTime = totalDuration // Complete the slider
+            state = .paused
             position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
+            currentUtterance = nil
         }
     }
     
@@ -693,15 +856,38 @@ extension TTSPlayer {
     
     // MARK: - System Voice Timeline Methods
     private func skipForwardSystem(_ seconds: TimeInterval) {
-        let currentElapsed = getCurrentElapsedTime()
-        let targetTime = currentElapsed + seconds
-        seek(to: targetTime)
+        guard !sentences.isEmpty else { return }
+        if currentIndex < sentences.count - 1 {
+            nextSentence()
+        } else {
+            // At the last sentence; finish reading and pause at end
+            synthesizer.stopSpeaking(at: .immediate)
+            currentUtterance = nil
+            stopProgressTimer()
+            currentIndex = sentences.count // Set to invalid index to represent "at end"
+            currentTime = totalDuration // Complete the slider
+            state = .paused
+            currentWordInSentence = ""
+            currentWordRange = nil
+            currentWordIndexInSentence = nil
+            currentWordToken = nil
+            position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
+        }
     }
     
     private func skipBackwardSystem(_ seconds: TimeInterval) {
-        let currentElapsed = getCurrentElapsedTime()
-        let targetTime = max(0, currentElapsed - seconds)
-        seek(to: targetTime)
+        guard !sentences.isEmpty else { return }
+        // Elapsed time within the current sentence
+        let elapsedInSentence = getCurrentElapsedTime() - getSentenceStartTime(currentIndex)
+        let restartThreshold: TimeInterval = 2.0
+        if elapsedInSentence > restartThreshold {
+            // Restart current sentence
+            let startTime = getSentenceStartTime(currentIndex)
+            seek(to: startTime)
+        } else {
+            // Go to previous sentence if possible
+            previousSentence()
+        }
     }
     
     private func seekSystemVoice(to time: TimeInterval, sentenceIndex: Int) {
@@ -722,6 +908,7 @@ extension TTSPlayer {
             self.sentenceStartTime = sentenceStartTime
             
             progress = Double(currentIndex) / Double(max(1, sentences.count))
+            state = .playing
             speakCurrentSentence_Apple()
             startProgressTimer()
         }
@@ -756,6 +943,7 @@ extension TTSPlayer {
         currentWordIndexInSentence = nil
         currentWordToken = nil
         position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
+        state = .playing
         progress = Double(currentIndex) / Double(max(1, sentences.count))
         
         // Start playing the sentence
