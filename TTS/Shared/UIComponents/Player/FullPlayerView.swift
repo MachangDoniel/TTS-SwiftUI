@@ -217,6 +217,8 @@ struct FullPlayerView: View {
                     Image(systemName: "square.and.arrow.up")
                         .font(.title2)
                 }
+                .disabled(true)
+                .opacity(0.4)
             }
             .padding(.horizontal)
             .foregroundColor(.white)

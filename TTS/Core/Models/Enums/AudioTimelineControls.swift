@@ -216,7 +216,8 @@ struct VoiceDownloadOptionsView: View {
     @Binding var isPresented: Bool
     
     @State private var selectedVoiceMode: AppVoiceMode = .system
-    @State private var selectedVoiceId: String = "1"
+    @State private var selectedVoiceSampleId: String = ""
+    @State private var selectedVoiceName: String = ""
     
     var body: some View {
         NavigationView {
@@ -237,8 +238,9 @@ struct VoiceDownloadOptionsView: View {
                         .font(.headline)
                     
                     Picker("Voice Mode", selection: $selectedVoiceMode) {
-                        Text("System Voice (Fast)").tag(AppVoiceMode.system)
-                        Text("Backend Voice (High Quality)").tag(AppVoiceMode.backend)
+                        if tts.appVoice == .system {
+                            Text("System Voice").tag(AppVoiceMode.system)
+                        }
                     }
                     .pickerStyle(.segmented)
                 }
@@ -248,11 +250,11 @@ struct VoiceDownloadOptionsView: View {
                     Text("Voice")
                         .font(.headline)
                     
-                    TextField("Voice ID", text: $selectedVoiceId)
+                    TextField("Voice Name", text: $selectedVoiceName)
                         .textFieldStyle(.roundedBorder)
                         .disabled(selectedVoiceMode == .system)
                     
-                    Text(selectedVoiceMode == .system ? "Uses current system voice" : "Enter voice ID for backend generation")
+                    Text(selectedVoiceMode == .system ? "Uses current system voice" : "Enter voice name for backend generation")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -282,7 +284,8 @@ struct VoiceDownloadOptionsView: View {
         }
         .onAppear {
             selectedVoiceMode = tts.appVoice
-            selectedVoiceId = tts.selectedVoiceSampleId
+            selectedVoiceSampleId = tts.selectedVoiceSampleId
+            selectedVoiceName = tts.selectedVoiceName
         }
     }
     
@@ -291,9 +294,10 @@ struct VoiceDownloadOptionsView: View {
             await downloader.downloadAudio(
                 for: content,
                 voiceMode: selectedVoiceMode,
-                voiceId: selectedVoiceId
+                voiceId: selectedVoiceSampleId
             )
         }
         isPresented = false
     }
 }
+

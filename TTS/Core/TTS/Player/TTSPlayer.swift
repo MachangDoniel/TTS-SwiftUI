@@ -38,6 +38,7 @@ final class TTSPlayer: NSObject, ObservableObject {
     @Published var currentURL: URL? = nil
     @Published var appVoice: AppVoiceMode = .system
     @Published var selectedVoiceSampleId: String = "com.apple.voice.super-compact.en-US.Samantha"
+    @Published var selectedVoiceName: String = "Samantha"
     
     // MARK: - Timeline Properties
     @Published var currentTime: TimeInterval = 0.0
@@ -75,8 +76,10 @@ final class TTSPlayer: NSObject, ObservableObject {
         self.config = config
         super.init()
         synthesizer.delegate = self
-        if let savedVoiceId = UserDefaults.standard.string(forKey: "selectedVoiceSampleId") {
+        if let savedVoiceId = UserDefaults.standard.string(forKey: KeyString.selectedVoiceSampleId),
+            let savedVoiceName = UserDefaults.standard.string(forKey: KeyString.selectedVoiceName) {
             self.selectedVoiceSampleId = savedVoiceId
+            self.selectedVoiceName = savedVoiceName
         }
     }
 }
@@ -478,7 +481,8 @@ extension TTSPlayer {
     func updateSelectedVoiceSampleId(_ voiceId: String) {
         let oldId = selectedVoiceSampleId
         selectedVoiceSampleId = voiceId
-        UserDefaults.standard.set(selectedVoiceSampleId, forKey: "selectedVoiceSampleId")
+        UserDefaults.standard.set(selectedVoiceSampleId, forKey: KeyString.selectedVoiceSampleId)
+        UserDefaults.standard.set(selectedVoiceName, forKey: KeyString.selectedVoiceName)
         guard appVoice == .system else {
             // Backend picks up new voice for future chunks
             backendWorker.refreshVoice(

@@ -268,6 +268,7 @@ struct LanguagePickerView: View {
                 tts.updateVoiceMode(targetMode)
             }
 
+            tts.selectedVoiceName = voice.name
             tts.updateSelectedVoiceSampleId(voice.voiceSampleId)
 
             Logger.debugPrint("🎙 Selected voice=\(voice.name) type=\(voice.type) → routing=\(targetMode == .backend ? "backend" : "local")")
