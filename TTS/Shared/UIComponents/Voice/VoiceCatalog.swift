@@ -26,16 +26,16 @@ final class VoiceCatalog: ObservableObject {
         // Backend (custom) voices with consistent voice type usage
         let backendVoices: [Voice] = [
 //            Voice(name: "Siri",      language: "English", accent: "US", mood: "Calm",      type: VoiceType.Free.rawValue,    voiceSampleId: "0"),
-            Voice(name: "Anastasia", language: "English", accent: "US", mood: "Calm",      type: VoiceType.Premium.rawValue, voiceSampleId: "1"),
-            Voice(name: "Carlos",    language: "Español", accent: "ES", mood: "Lively",    type: VoiceType.Premium.rawValue, voiceSampleId: "2"),
-            Voice(name: "Emma",      language: "English", accent: "UK", mood: "Friendly",  type: VoiceType.Premium.rawValue, voiceSampleId: "3"),
-            Voice(name: "Nikolai",   language: "Russian", accent: "RU", mood: "Calm",      type: VoiceType.Premium.rawValue, voiceSampleId: "4"),
-            Voice(name: "Sophia",    language: "German",  accent: "DE", mood: "Bright",    type: VoiceType.Premium.rawValue, voiceSampleId: "5"),
-            Voice(name: "Mia",       language: "Danish",  accent: "DK", mood: "Energetic", type: VoiceType.Premium.rawValue, voiceSampleId: "6"),
-            Voice(name: "Giovanni",  language: "Italian", accent: "IT", mood: "Smooth",    type: VoiceType.Premium.rawValue, voiceSampleId: "7"),
-            Voice(name: "Lena",      language: "Greek",   accent: "GR", mood: "Warm",      type: VoiceType.Premium.rawValue, voiceSampleId: "8"),
-            Voice(name: "Aarav",     language: "Hindi",   accent: "IN", mood: "Deep",      type: VoiceType.Premium.rawValue, voiceSampleId: "9"),
-            Voice(name: "Maria",     language: "Español", accent: "MX", mood: "Soft",      type: VoiceType.Premium.rawValue, voiceSampleId: "10"),
+//            Voice(name: "Anastasia", language: "English", accent: "US", mood: "Calm",      type: VoiceType.Premium.rawValue, voiceSampleId: "1"),
+//            Voice(name: "Carlos",    language: "Español", accent: "ES", mood: "Lively",    type: VoiceType.Premium.rawValue, voiceSampleId: "2"),
+//            Voice(name: "Emma",      language: "English", accent: "UK", mood: "Friendly",  type: VoiceType.Premium.rawValue, voiceSampleId: "3"),
+//            Voice(name: "Nikolai",   language: "Russian", accent: "RU", mood: "Calm",      type: VoiceType.Premium.rawValue, voiceSampleId: "4"),
+//            Voice(name: "Sophia",    language: "German",  accent: "DE", mood: "Bright",    type: VoiceType.Premium.rawValue, voiceSampleId: "5"),
+//            Voice(name: "Mia",       language: "Danish",  accent: "DK", mood: "Energetic", type: VoiceType.Premium.rawValue, voiceSampleId: "6"),
+//            Voice(name: "Giovanni",  language: "Italian", accent: "IT", mood: "Smooth",    type: VoiceType.Premium.rawValue, voiceSampleId: "7"),
+//            Voice(name: "Lena",      language: "Greek",   accent: "GR", mood: "Warm",      type: VoiceType.Premium.rawValue, voiceSampleId: "8"),
+//            Voice(name: "Aarav",     language: "Hindi",   accent: "IN", mood: "Deep",      type: VoiceType.Premium.rawValue, voiceSampleId: "9"),
+//            Voice(name: "Maria",     language: "Español", accent: "MX", mood: "Soft",      type: VoiceType.Premium.rawValue, voiceSampleId: "10"),
         ]
         let backendIds = Set(backendVoices.map { $0.voiceSampleId })
 

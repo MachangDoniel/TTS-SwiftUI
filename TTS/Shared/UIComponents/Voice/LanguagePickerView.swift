@@ -19,6 +19,7 @@ struct LanguagePickerView: View {
     @State private var selectedLanguage: String? = nil // nil = all
     @State private var isLoading: Bool = false
     @State private var errorMessage: String? = nil
+    @State private var lastOpenedSelectedVoiceId: String? = nil // snapshot when language picker opens
     @FocusState private var isSearchFieldFocused: Bool
 
     /// shared TTS player (via environment)
@@ -28,7 +29,8 @@ struct LanguagePickerView: View {
 
     // MARK: - Filtering
     var filteredVoices: [Voice] {
-        voiceCatalog.voices.filter { voice in
+        // Base filtering
+        let base = voiceCatalog.voices.filter { voice in
             let matchesSearch = searchText.isEmpty ||
                 voice.name.localizedCaseInsensitiveContains(searchText) ||
                 voice.language.localizedCaseInsensitiveContains(searchText)
@@ -36,6 +38,17 @@ struct LanguagePickerView: View {
             let matchesType = selectedFilter == nil || voice.type == selectedFilter?.rawValue
             return matchesSearch && matchesLanguage && matchesType
         }
+
+        // Reorder so the voice that was selected when the view/picker opened appears at the top
+        if let selectedId = lastOpenedSelectedVoiceId {
+            if let idx = base.firstIndex(where: { $0.voiceSampleId == selectedId }) {
+                var reordered = base
+                let selected = reordered.remove(at: idx)
+                return [selected] + reordered
+            }
+        }
+
+        return base
     }
 
     // MARK: - Body
@@ -107,7 +120,7 @@ struct LanguagePickerView: View {
                                     Button {
                                         selectVoice(voice)
                                     } label: {
-                                        VoiceCard(voice: voice)
+                                        VoiceCard(voice: voice, isSelected: tts.selectedVoiceSampleId == voice.voiceSampleId)
                                     }
                                 }
                             }
@@ -116,6 +129,10 @@ struct LanguagePickerView: View {
                         .padding(.bottom, 40)
                     }
                 }
+            }
+            .onAppear {
+                // snapshot selected voice when the view loads
+                lastOpenedSelectedVoiceId = tts.selectedVoiceSampleId
             }
             .preferredColorScheme(.dark)
         }
@@ -178,7 +195,11 @@ struct LanguagePickerView: View {
                     .foregroundColor(.white)
             }
 
-            Button(action: { withAnimation(.spring()) { showLanguageOptions.toggle() } }) {
+            Button(action: {
+                withAnimation(.spring()) {
+                    showLanguageOptions.toggle()
+                }
+            }) {
                 HStack(spacing: 4) {
                     Text("Language")
                         .font(.headline)
@@ -187,8 +208,8 @@ struct LanguagePickerView: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
-                .foregroundColor(showLanguageOptions ? Color.blue : Color.white)
-                .background(showLanguageOptions ? Color.blue.opacity(0.2) : Color(.systemGray6))
+                .foregroundColor(showLanguageOptions ? Color.myPrimaryColor : Color.white)
+                .background(showLanguageOptions ? Color.myPrimaryColor.opacity(0.2) : Color(.systemGray6))
                 .clipShape(Capsule())
             }
 
@@ -201,8 +222,8 @@ struct LanguagePickerView: View {
                     .font(.headline)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                    .foregroundColor(selectedFilter == VoiceType.Free ? Color.blue : Color.white)
-                    .background(selectedFilter == VoiceType.Free ? Color.blue.opacity(0.2) : Color(.systemGray6))
+                    .foregroundColor(selectedFilter == VoiceType.Free ? Color.myPrimaryColor : Color.white)
+                    .background(selectedFilter == VoiceType.Free ? Color.myPrimaryColor.opacity(0.2) : Color(.systemGray6))
                     .clipShape(Capsule())
             }
 
@@ -223,8 +244,8 @@ struct LanguagePickerView: View {
                             .font(.subheadline)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
-                            .foregroundColor(selectedLanguage == lang ? Color.blue : Color.white)
-                            .background(selectedLanguage == lang ? Color.blue.opacity(0.2) : Color(.systemGray6))
+                            .foregroundColor(selectedLanguage == lang ? Color.myPrimaryColor : Color.white)
+                            .background(selectedLanguage == lang ? Color.myPrimaryColor.opacity(0.2) : Color(.systemGray6))
                             .clipShape(Capsule())
                     }
                 }
@@ -247,6 +268,7 @@ struct LanguagePickerView: View {
                 tts.updateVoiceMode(targetMode)
             }
 
+            tts.selectedVoiceName = voice.name
             tts.updateSelectedVoiceSampleId(voice.voiceSampleId)
 
             Logger.debugPrint("🎙 Selected voice=\(voice.name) type=\(voice.type) → routing=\(targetMode == .backend ? "backend" : "local")")
@@ -263,3 +285,4 @@ struct LanguagePickerView: View {
         .environmentObject(TTSPlayer())
         .environmentObject(VoiceCatalog.shared)
 }
+

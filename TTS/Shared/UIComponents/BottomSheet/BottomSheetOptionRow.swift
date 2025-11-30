@@ -16,7 +16,7 @@ struct BottomSheetOptionRow: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundColor(.blue)
+                .foregroundColor(.myPrimaryColor)
                 .frame(width: 30)
             
             VStack(alignment: .leading, spacing: 4) {

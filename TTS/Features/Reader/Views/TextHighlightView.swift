@@ -46,7 +46,7 @@ struct ReadOnlyAccurateHighlight: View {
         
         // Highlight current sentence with subtle background
         if let sentenceCharRange = nsRangeToAttributedStringRange(sentenceRange, in: attr) {
-            attr[sentenceCharRange].backgroundColor = Color.blue.opacity(0.15)
+            attr[sentenceCharRange].backgroundColor = Color.myPrimaryColor.opacity(0.15)
         }
         
         // Highlight current word with prominent style
@@ -69,7 +69,7 @@ struct ReadOnlyAccurateHighlight: View {
             }
             
             // Apply prominent word highlighting
-            attr[wordCharRange].backgroundColor = Color.blue.opacity(0.5)
+            attr[wordCharRange].backgroundColor = Color.myPrimaryColor.opacity(0.5)
             attr[wordCharRange].font = .system(size: 18, weight: .regular)
         }
         
@@ -177,7 +177,7 @@ struct EditableSentenceHighlight: View {
                 
                 if let frame = sentenceFrame {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.blue.opacity(0.2))
+                        .fill(Color.myPrimaryColor.opacity(0.2))
                         .frame(width: frame.width, height: frame.height)
                         .offset(x: frame.minX, y: frame.minY)
                         .animation(.easeInOut(duration: 0.15), value: frame)

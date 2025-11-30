@@ -21,20 +21,6 @@ final class RecentStore: ObservableObject {
     private let container: NSPersistentContainer
     private let context: NSManagedObjectContext
     
-    // MARK: - Entity + Attribute KeyString
-       private struct KeyString {
-           static let entity = "RecentActivityEntity"
-           static let id = "id"
-           static let modelName = "RecentModel"
-           static let objectName = "NSManagedObject"
-           static let title = "title"
-           static let sourcePath = "sourcePath"
-           static let kind = "kind"
-           static let createdAt = "createdAt"
-           static let thumbnailData = "thumbnailData"
-           static let bookmarkData = "bookmarkData"
-       }
-    
     init() {
         let model = Self.buildModel()
         container = NSPersistentContainer(name: KeyString.modelName, managedObjectModel: model)

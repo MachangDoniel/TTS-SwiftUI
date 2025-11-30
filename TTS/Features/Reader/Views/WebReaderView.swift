@@ -40,7 +40,7 @@ struct WebReaderView: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.blue.cornerRadius(12))
+                    .background(Color.myPrimaryColor.cornerRadius(12))
                     .padding(.horizontal, 24)
                     .padding(.vertical, 16)
             }

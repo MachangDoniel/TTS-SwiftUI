@@ -37,7 +37,7 @@ struct TTSDemoView: View {
                         }
                     }
                     .padding()
-                    .background(Color.blue)
+                    .background(Color.myPrimaryColor)
                     .foregroundColor(.white)
                     .cornerRadius(10)
                     
@@ -94,7 +94,7 @@ struct TTSDemoView: View {
                         if let downloadUrl = data.downloadUrl,
                            let url = URL(string: downloadUrl) {
                             Link("Download Audio", destination: url)
-                                .foregroundColor(.blue)
+                                .foregroundColor(.myPrimaryColor)
                                 .underline()
                         } else {
                             Text("Download URL: Not available")
@@ -140,7 +140,7 @@ struct TTSDemoView: View {
                         if let downloadUrl = data.downloadUrl,
                            let url = URL(string: downloadUrl) {
                             Link("Download Audio", destination: url)
-                                .foregroundColor(.blue)
+                                .foregroundColor(.myPrimaryColor)
                                 .underline()
                         }
                     }

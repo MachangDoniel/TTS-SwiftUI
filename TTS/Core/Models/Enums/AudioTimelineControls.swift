@@ -113,7 +113,7 @@ struct TimelineSlider: View {
                     }
                 }
             )
-            .accentColor(.blue)
+            .accentColor(.myPrimaryColor)
             .disabled(!tts.isSeekable)
             
             // Progress indicators (sentences)
@@ -122,7 +122,7 @@ struct TimelineSlider: View {
                     HStack(spacing: 0) {
                         ForEach(0..<tts.sentences.count, id: \.self) { index in
                             Rectangle()
-                                .fill(index <= tts.currentIndex ? Color.blue : Color.gray.opacity(0.3))
+                                .fill(index <= tts.currentIndex ? Color.myPrimaryColor : Color.gray.opacity(0.3))
                                 .frame(height: 2)
                                 .animation(.easeInOut(duration: 0.2), value: tts.currentIndex)
                         }
@@ -196,11 +196,11 @@ struct AudioDownloadButton: View {
     private var downloadBackgroundColor: Color {
         switch downloadState {
         case .notStarted:
-            return .blue.opacity(0.7)
+            return .myPrimaryColor.opacity(0.7)
         case .queued:
             return .orange.opacity(0.7)
         case .downloading:
-            return .blue.opacity(0.9)
+            return .myPrimaryColor.opacity(0.9)
         case .completed:
             return .green.opacity(0.7)
         case .failed:
@@ -216,7 +216,8 @@ struct VoiceDownloadOptionsView: View {
     @Binding var isPresented: Bool
     
     @State private var selectedVoiceMode: AppVoiceMode = .system
-    @State private var selectedVoiceId: String = "1"
+    @State private var selectedVoiceSampleId: String = ""
+    @State private var selectedVoiceName: String = ""
     
     var body: some View {
         NavigationView {
@@ -237,8 +238,9 @@ struct VoiceDownloadOptionsView: View {
                         .font(.headline)
                     
                     Picker("Voice Mode", selection: $selectedVoiceMode) {
-                        Text("System Voice (Fast)").tag(AppVoiceMode.system)
-                        Text("Backend Voice (High Quality)").tag(AppVoiceMode.backend)
+                        if tts.appVoice == .system {
+                            Text("System Voice").tag(AppVoiceMode.system)
+                        }
                     }
                     .pickerStyle(.segmented)
                 }
@@ -248,11 +250,11 @@ struct VoiceDownloadOptionsView: View {
                     Text("Voice")
                         .font(.headline)
                     
-                    TextField("Voice ID", text: $selectedVoiceId)
+                    TextField("Voice Name", text: $selectedVoiceName)
                         .textFieldStyle(.roundedBorder)
                         .disabled(selectedVoiceMode == .system)
                     
-                    Text(selectedVoiceMode == .system ? "Uses current system voice" : "Enter voice ID for backend generation")
+                    Text(selectedVoiceMode == .system ? "Uses current system voice" : "Enter voice name for backend generation")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -267,7 +269,7 @@ struct VoiceDownloadOptionsView: View {
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
-                .background(Color.blue)
+                .background(Color.myPrimaryColor)
                 .cornerRadius(8)
             }
             .padding()
@@ -282,7 +284,8 @@ struct VoiceDownloadOptionsView: View {
         }
         .onAppear {
             selectedVoiceMode = tts.appVoice
-            selectedVoiceId = tts.selectedVoiceSampleId
+            selectedVoiceSampleId = tts.selectedVoiceSampleId
+            selectedVoiceName = tts.selectedVoiceName
         }
     }
     
@@ -291,9 +294,10 @@ struct VoiceDownloadOptionsView: View {
             await downloader.downloadAudio(
                 for: content,
                 voiceMode: selectedVoiceMode,
-                voiceId: selectedVoiceId
+                voiceId: selectedVoiceSampleId
             )
         }
         isPresented = false
     }
 }
+

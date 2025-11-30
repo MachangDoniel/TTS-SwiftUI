@@ -37,7 +37,8 @@ final class TTSPlayer: NSObject, ObservableObject {
     @Published var currentTitle: String? = nil
     @Published var currentURL: URL? = nil
     @Published var appVoice: AppVoiceMode = .system
-    @Published var selectedVoiceSampleId: String = "1"
+    @Published var selectedVoiceSampleId: String = "com.apple.voice.super-compact.en-US.Samantha"
+    @Published var selectedVoiceName: String = "Samantha"
     
     // MARK: - Timeline Properties
     @Published var currentTime: TimeInterval = 0.0
@@ -75,6 +76,11 @@ final class TTSPlayer: NSObject, ObservableObject {
         self.config = config
         super.init()
         synthesizer.delegate = self
+        if let savedVoiceId = UserDefaults.standard.string(forKey: KeyString.selectedVoiceSampleId),
+            let savedVoiceName = UserDefaults.standard.string(forKey: KeyString.selectedVoiceName) {
+            self.selectedVoiceSampleId = savedVoiceId
+            self.selectedVoiceName = savedVoiceName
+        }
     }
 }
 
@@ -475,6 +481,8 @@ extension TTSPlayer {
     func updateSelectedVoiceSampleId(_ voiceId: String) {
         let oldId = selectedVoiceSampleId
         selectedVoiceSampleId = voiceId
+        UserDefaults.standard.set(selectedVoiceSampleId, forKey: KeyString.selectedVoiceSampleId)
+        UserDefaults.standard.set(selectedVoiceName, forKey: KeyString.selectedVoiceName)
         guard appVoice == .system else {
             // Backend picks up new voice for future chunks
             backendWorker.refreshVoice(
@@ -485,35 +493,19 @@ extension TTSPlayer {
             )
             return
         }
-        guard state == .playing else { return }
-        guard oldId != voiceId else { return }
-        // For Apple engine: restart the remaining text of the current sentence with new voice
-        // Compute remaining substring based on currentWordRange
-        let sentence = currentSentenceText
-        let remaining: String = {
-            if let range = currentWordRange,
-               let swiftRange = Range(range, in: sentence) {
-                return String(sentence[swiftRange.lowerBound...])
+        if oldId != voiceId || state == .playing || state == .paused {
+            synthesizer.stopSpeaking(at: .immediate)
+            currentWordInSentence = ""
+            currentWordRange = nil
+            currentWordToken = nil
+            speakCurrentSentence_Apple()
+            if state == .playing {
+                state = .playing
+            } else if state == .paused {
+                // Pause immediately after starting utterance to keep paused state
+                synthesizer.pauseSpeaking(at: .immediate)
+                state = .paused
             }
-            return sentence
-        }()
-        synthesizer.stopSpeaking(at: .immediate)
-        currentWordInSentence = ""
-        currentWordRange = nil
-        currentWordToken = nil
-        if !remaining.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            let utterance = AVSpeechUtterance(string: remaining)
-            if let sysVoice = AVSpeechSynthesisVoice(identifier: selectedVoiceSampleId) {
-                utterance.voice = sysVoice
-            } else {
-                utterance.voice = AVSpeechSynthesisVoice(language: config.language)
-            }
-            utterance.rate = config.rate
-            synthesizer.speak(utterance)
-            state = .playing
-        } else {
-            // Nothing remaining → move to next sentence
-            speechSynthesizer(synthesizer, didFinish: AVSpeechUtterance(string: sentence))
         }
     }
 }

@@ -89,7 +89,7 @@ struct DownloadedFileRow: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Image(systemName: file.fileType.icon)
-                    .foregroundColor(.blue)
+                    .foregroundColor(.myPrimaryColor)
                 
                 VStack(alignment: .leading) {
                     Text(file.title)

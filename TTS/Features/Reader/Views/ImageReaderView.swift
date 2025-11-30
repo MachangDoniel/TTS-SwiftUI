@@ -58,7 +58,7 @@ struct ImageReaderView: View {
                             ForEach(wordBoxes, id: \.id) { box in
                                 if isCurrentWord(box.text) {
                                     RoundedRectangle(cornerRadius: 4)
-                                        .fill(Color.blue.opacity(0.4))
+                                        .fill(Color.myPrimaryColor.opacity(0.4))
                                         .frame(
                                             width: box.rect.width * geo.size.width,
                                             height: box.rect.height * geo.size.height
@@ -76,7 +76,7 @@ struct ImageReaderView: View {
 
                     if isProcessing {
                         ProgressView("Analyzing text...")
-                            .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                            .progressViewStyle(CircularProgressViewStyle(tint: .myPrimaryColor))
                             .foregroundColor(.white)
                             .background(Color.black.opacity(0.6))
                     }

@@ -50,7 +50,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				Shared/Extension/Color.swift,
 				"TTS-Prod-Info.plist",
 			);
 			target = D94AF8BD2E9146650017C37C /* TTS */;
@@ -59,38 +58,18 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				Shared/Extension/Color.swift,
 				"TTS-Prod-Info.plist",
 			);
 			target = D964FBCB2EA5565F006A2573 /* TTS Prod */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
-/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-		D95125C12EA4CE5400C202AD /* Exceptions for "TTS" folder in "Copy Bundle Resources" phase from "TTS" target */ = {
-			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
-			buildPhase = D94AF8BC2E9146650017C37C /* Resources */;
-			membershipExceptions = (
-				Shared/Extension/Color.swift,
-			);
-		};
-		D964FEC12EA63CE0006A2573 /* Exceptions for "TTS" folder in "Copy Bundle Resources" phase from "TTS Prod" target */ = {
-			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
-			buildPhase = D964FBD62EA5565F006A2573 /* Resources */;
-			membershipExceptions = (
-				Shared/Extension/Color.swift,
-			);
-		};
-/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		D94AF8C02E9146650017C37C /* TTS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				D95125C02EA4CE5400C202AD /* Exceptions for "TTS" folder in "TTS" target */,
-				D95125C12EA4CE5400C202AD /* Exceptions for "TTS" folder in "Copy Bundle Resources" phase from "TTS" target */,
 				D964FBDC2EA5565F006A2573 /* Exceptions for "TTS" folder in "TTS Prod" target */,
-				D964FEC12EA63CE0006A2573 /* Exceptions for "TTS" folder in "Copy Bundle Resources" phase from "TTS Prod" target */,
 			);
 			path = TTS;
 			sourceTree = "<group>";
@@ -493,7 +472,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 100103;
+				CURRENT_PROJECT_VERSION = 100106;
 				DEVELOPMENT_TEAM = W49J7LTUV4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -536,7 +515,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 100103;
+				CURRENT_PROJECT_VERSION = 100106;
 				DEVELOPMENT_TEAM = W49J7LTUV4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
