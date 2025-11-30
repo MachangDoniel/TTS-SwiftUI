@@ -99,11 +99,15 @@ struct FullPlayerView: View {
             
             // Time display and sentence counter
             HStack {
-                Text(formatTime(tts.currentTime))
-                Spacer()
-                Text("\(tts.currentIndex + 1) of \(max(tts.sentences.count, 1))")
-                Spacer()
-                Text(formatTime(tts.totalDuration))
+                if tts.appVoice == .backend {
+                    Text(formatTime(tts.currentTime))
+                    Spacer()
+                }
+                Text("\(min(tts.currentIndex, tts.sentences.count - 1) + 1) of \(max(tts.sentences.count, 1))")
+                if tts.appVoice == .backend {
+                    Spacer()
+                    Text(formatTime(tts.totalDuration))
+                }
             }
             .font(.caption)
             .foregroundColor(.gray)

@@ -58,19 +58,31 @@ struct AudioTimelineControls: View {
             }
             .padding(.horizontal)
             
-            // Time Display
-            HStack {
-                Text(formatTime(tts.currentTime))
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                
-                Spacer()
-                
-                Text(formatTime(tts.totalDuration))
-                    .font(.caption)
-                    .foregroundColor(.gray)
+            // Time Display (only for backend voice)
+            if tts.appVoice == .backend {
+                HStack {
+                    Text(formatTime(tts.currentTime))
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    
+                    Spacer()
+                    
+                    Text(formatTime(tts.totalDuration))
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+                .padding(.horizontal)
+            } else {
+                // Sentence counter for system voice
+                HStack {
+                    Spacer()
+                    Text("\(min(tts.currentIndex, tts.sentences.count - 1) + 1) of \(max(tts.sentences.count, 1))")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    Spacer()
+                }
+                .padding(.horizontal)
             }
-            .padding(.horizontal)
         }
         .padding(.vertical, 8)
         .background(Color.black.opacity(0.9))
