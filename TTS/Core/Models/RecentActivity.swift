@@ -19,6 +19,7 @@ struct RecentActivity: Identifiable, Codable, Equatable {
     var createdAt: Date
     var thumbnailData: Data?
     var bookmarkData: Data?
+    var wordCount: Int?
 
     // Derived properties
     var fileExtension: FileExtension {
@@ -57,7 +58,8 @@ struct RecentActivity: Identifiable, Codable, Equatable {
          kind: InputSource,
          createdAt: Date = Date(),
          thumbnailData: Data? = nil,
-         bookmarkData: Data? = nil) {
+         bookmarkData: Data? = nil,
+         wordCount: Int? = nil) {
         self.id = id
         self.title = title
         self.sourcePath = sourcePath
@@ -65,6 +67,7 @@ struct RecentActivity: Identifiable, Codable, Equatable {
         self.createdAt = createdAt
         self.thumbnailData = thumbnailData
         self.bookmarkData = bookmarkData
+        self.wordCount = wordCount
     }
 
     // Resolve usable URL

@@ -97,20 +97,24 @@ struct FullPlayerView: View {
                 //                }
             }
             
-            // Time display and sentence counter
+            // Time display: current time (left), sentence counter (middle), total time (right)
             HStack {
-                if tts.appVoice == .backend {
-                    Text(formatTime(tts.currentTime))
-                    Spacer()
-                }
+                Text(formatTime(tts.currentTime))
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                
+                Spacer()
+                
                 Text("\(min(tts.currentIndex, tts.sentences.count - 1) + 1) of \(max(tts.sentences.count, 1))")
-                if tts.appVoice == .backend {
-                    Spacer()
-                    Text(formatTime(tts.totalDuration))
-                }
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                
+                Spacer()
+                
+                Text(formatTime(tts.totalDuration))
+                    .font(.caption)
+                    .foregroundColor(.gray)
             }
-            .font(.caption)
-            .foregroundColor(.gray)
             .padding(.horizontal)
             
             // Main controls
@@ -120,7 +124,7 @@ struct FullPlayerView: View {
                 Button(action: {
                     showLanguagePicker.toggle()
                 }) {
-                    Image("liberia_flag") // Replace with your asset or SF symbol
+                    Image("default_voice_image") 
                         .resizable()
                         .frame(width: 44, height: 44)
                         .clipShape(Circle())

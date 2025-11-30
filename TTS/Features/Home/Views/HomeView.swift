@@ -26,12 +26,6 @@ struct HomeView: View {
     
     @State private var renamingItem: RecentActivity? = nil
     @State private var newTitle: String = ""
-    
-    private let timeFormatter: DateFormatter = {
-        let df = DateFormatter()
-        df.dateFormat = "HH:mm"
-        return df
-    }()
 
     var body: some View {
         ZStack {
@@ -158,7 +152,7 @@ struct HomeView: View {
                 VStack(spacing: 14) {
                     ForEach(recentStore.items) { item in
                         Button(action: { openRecentItem(item) }) {
-                            RecentRow(item: item, timeFormatter: timeFormatter)
+                            RecentRow(item: item)
                         }
                         .padding(.horizontal, 20)
                         .swipeActions(edge: .trailing) {

@@ -20,6 +20,7 @@ public struct KeyString {
     static let createdAt = "createdAt"
     static let thumbnailData = "thumbnailData"
     static let bookmarkData = "bookmarkData"
+    static let wordCount = "wordCount"
     
     static let selectedVoiceSampleId = "selectedVoiceSampleId"
     static let selectedVoiceName = "selectedVoiceName"

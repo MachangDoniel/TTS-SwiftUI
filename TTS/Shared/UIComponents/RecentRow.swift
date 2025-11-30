@@ -9,7 +9,6 @@ import SwiftUI
 
 struct RecentRow: View {
     let item: RecentActivity
-    let timeFormatter: DateFormatter
 
     var body: some View {
         HStack(spacing: 12) {
@@ -24,11 +23,32 @@ struct RecentRow: View {
                     .foregroundColor(.white)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                Text(timeFormatter.string(from: item.createdAt))
+                Text(formatTimeToComplete())
                     .font(.system(size: 12, weight: .regular))
                     .foregroundColor(.white.opacity(0.6))
             }
             Spacer(minLength: 0)
+        }
+    }
+    
+    private func formatTimeToComplete() -> String {
+        guard let wordCount = item.wordCount, wordCount > 0 else {
+            return "0 sec"
+        }
+        
+        // Calculate time: 0.4 seconds per word
+        let totalSeconds = 0.4 * Double(wordCount)
+        let minutes = Int(totalSeconds) / 60
+        let seconds = Int(totalSeconds) % 60
+        
+        if minutes > 0 {
+            if seconds > 0 {
+                return "\(minutes) min \(seconds) sec"
+            } else {
+                return "\(minutes) min"
+            }
+        } else {
+            return "\(seconds) sec"
         }
     }
 

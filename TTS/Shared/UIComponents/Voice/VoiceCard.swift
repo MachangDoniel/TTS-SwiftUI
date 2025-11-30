@@ -13,10 +13,12 @@ struct VoiceCard: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "person.crop.circle.fill")
+            Image("default_voice_image")
                 .resizable()
+                .scaledToFill()
                 .frame(width: 50, height: 50)
-                .foregroundColor(.gray)
+                .clipShape(Circle())
+                .clipped()
                 .overlay(
                     Group {
                         if isSelected {
