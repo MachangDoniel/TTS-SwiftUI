@@ -10,6 +10,7 @@ import Combine
 import CoreData
 import PDFKit
 import UIKit
+import Vision
 
 // MARK: - Store (Core Data persistence)
 final class RecentStore: ObservableObject {
@@ -87,7 +88,12 @@ final class RecentStore: ObservableObject {
         bookmarkAttr.attributeType = .binaryDataAttributeType
         bookmarkAttr.isOptional = true
         
-        entity.properties = [idAttr, titleAttr, sourcePathAttr, kindAttr, createdAtAttr, thumbAttr, bookmarkAttr]
+        let wordCountAttr = NSAttributeDescription()
+        wordCountAttr.name = KeyString.wordCount
+        wordCountAttr.attributeType = .integer64AttributeType
+        wordCountAttr.isOptional = true
+        
+        entity.properties = [idAttr, titleAttr, sourcePathAttr, kindAttr, createdAtAttr, thumbAttr, bookmarkAttr, wordCountAttr]
         
         // No uniqueness constraints; we'll dedupe manually for flexible logic
         model.entities = [entity]
@@ -124,11 +130,34 @@ final class RecentStore: ObservableObject {
                 thumb = thumbnail.pngData()
             }
         }
+        
+        // Calculate word count (sync for PDF/TXT, async for images)
+        let ext = fileURL.pathExtension.lowercased()
+        let wordCount: Int?
+        
+        if ["png", "jpg", "jpeg", "heic"].contains(ext) {
+            // Images need async OCR - will update later
+            wordCount = nil
+        } else {
+            // PDF and TXT can be calculated synchronously
+            wordCount = calculateWordCount(fileURL: fileURL, kind: kind)
+        }
+        
         let activity = RecentActivity(title: display,
                                       sourcePath: fileURL.isFileURL ? fileURL.path : fileURL.absoluteString,
                                       kind: kind,
-                                      thumbnailData: thumb)
+                                      thumbnailData: thumb,
+                                      wordCount: wordCount)
         dedupAndInsert(activity)
+        
+        // For images, perform async OCR and update wordCount
+        if ["png", "jpg", "jpeg", "heic"].contains(ext) {
+            extractTextFromImage(url: fileURL) { [weak self] text in
+                guard let self = self, let text = text else { return }
+                let count = self.calculateWordCount(from: text)
+                self.updateWordCount(for: activity.id, count: count)
+            }
+        }
     }
     
     func addExternal(fileURL: URL, bookmarkData: Data, kind: InputSource) {
@@ -153,12 +182,34 @@ final class RecentStore: ObservableObject {
                 thumb = thumbnail.pngData()
             }
         }
+        // Calculate word count (sync for PDF/TXT, async for images)
+        let ext = fileURL.pathExtension.lowercased()
+        let wordCount: Int?
+        
+        if ["png", "jpg", "jpeg", "heic"].contains(ext) {
+            // Images need async OCR - will update later
+            wordCount = nil
+        } else {
+            // PDF and TXT can be calculated synchronously
+            wordCount = calculateWordCount(fileURL: fileURL, kind: kind)
+        }
+        
         let activity = RecentActivity(title: display,
                                       sourcePath: fileURL.isFileURL ? fileURL.path : fileURL.absoluteString,
                                       kind: kind,
                                       thumbnailData: thumb,
-                                      bookmarkData: bookmarkData)
+                                      bookmarkData: bookmarkData,
+                                      wordCount: wordCount)
         dedupAndInsert(activity)
+        
+        // For images, perform async OCR and update wordCount
+        if ["png", "jpg", "jpeg", "heic"].contains(ext) {
+            extractTextFromImage(url: fileURL) { [weak self] text in
+                guard let self = self, let text = text else { return }
+                let count = self.calculateWordCount(from: text)
+                self.updateWordCount(for: activity.id, count: count)
+            }
+        }
     }
     
     func addLink(url: URL, title: String? = nil) {
@@ -178,7 +229,8 @@ final class RecentStore: ObservableObject {
     func addText(content: String) {
         let firstLine = content.split(separator: "\n").first.map(String.init) ?? content
         let display = sanitizeTitle(firstLine)
-        let activity = RecentActivity(title: display, kind: .text)
+        let wordCount = calculateWordCount(from: content)
+        let activity = RecentActivity(title: display, kind: .text, wordCount: wordCount)
         dedupAndInsert(activity)
     }
     
@@ -303,6 +355,113 @@ final class RecentStore: ObservableObject {
         return candidate
     }
     
+    // MARK: - Word Count Helpers
+    
+    private func countWords(from text: String) -> Int {
+        let tokens = WordTokenizer.tokenize(text)
+        return tokens.count
+    }
+    
+    private func extractTextFromPDF(url: URL) -> String? {
+        guard let pdf = PDFDocument(url: url) else { return nil }
+        var text = ""
+        for i in 0..<pdf.pageCount {
+            if let page = pdf.page(at: i) {
+                text += page.string ?? ""
+                text += "\n"
+            }
+        }
+        return text.isEmpty ? nil : text
+    }
+    
+    private func extractTextFromTXT(url: URL) -> String? {
+        guard let data = try? Data(contentsOf: url),
+              let content = String(data: data, encoding: .utf8),
+              !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        return content
+    }
+    
+    private func extractTextFromImage(url: URL, completion: @escaping (String?) -> Void) {
+        guard let image = UIImage(contentsOfFile: url.path),
+              let cgImage = image.cgImage else {
+            completion(nil)
+            return
+        }
+        
+        let request = VNRecognizeTextRequest { request, error in
+            if let error = error {
+                Logger.log("[RecentStore] OCR error: \(error.localizedDescription)")
+                completion(nil)
+                return
+            }
+            
+            let observations = request.results as? [VNRecognizedTextObservation] ?? []
+            let lines: [String] = observations.compactMap { $0.topCandidates(1).first?.string }
+            let text = lines.joined(separator: "\n")
+            completion(text.isEmpty ? nil : text)
+        }
+        
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = true
+        request.recognitionLanguages = ["en-US", "bn-BD", "hi-IN"]
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+            do {
+                try handler.perform([request])
+            } catch {
+                Logger.log("[RecentStore] OCR handler error: \(error.localizedDescription)")
+                completion(nil)
+            }
+        }
+    }
+    
+    private func calculateWordCount(fileURL: URL, kind: InputSource) -> Int? {
+        let ext = fileURL.pathExtension.lowercased()
+        
+        switch ext {
+        case "pdf":
+            guard let text = extractTextFromPDF(url: fileURL) else { return nil }
+            return countWords(from: text)
+            
+        case "txt":
+            guard let text = extractTextFromTXT(url: fileURL) else { return nil }
+            return countWords(from: text)
+            
+        case "png", "jpg", "jpeg", "heic":
+            // Images require async OCR, return nil for now
+            // Will be handled separately in async flow
+            return nil
+            
+        default:
+            // Unknown file type
+            return nil
+        }
+    }
+    
+    private func calculateWordCount(from text: String) -> Int? {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        let count = countWords(from: text)
+        return count > 0 ? count : nil
+    }
+    
+    private func updateWordCount(for id: UUID, count: Int?) {
+        let fr = NSFetchRequest<NSManagedObject>(entityName: KeyString.entity)
+        fr.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        fr.fetchLimit = 1
+        do {
+            if let obj = try context.fetch(fr).first {
+                obj.setValue(count, forKey: KeyString.wordCount)
+                try context.save()
+                load() // Refresh published items
+            }
+        } catch {
+            // Ignore errors
+        }
+    }
+    
     private func dedupAndInsert(_ activity: RecentActivity) {
         // Delete duplicates according to sourcePath if present, else by (kind,title)
         let fetch: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: KeyString.entity)
@@ -326,6 +485,7 @@ final class RecentStore: ObservableObject {
             obj.setValue(activity.createdAt, forKey: KeyString.createdAt)
             obj.setValue(activity.thumbnailData, forKey: KeyString.thumbnailData)
             obj.setValue(activity.bookmarkData, forKey: KeyString.bookmarkData)
+            obj.setValue(activity.wordCount, forKey: KeyString.wordCount)
             
             // Trim to maxItems by deleting older ones beyond limit
             try context.save()
@@ -367,7 +527,8 @@ final class RecentStore: ObservableObject {
                 let createdAt = (obj.value(forKey: KeyString.createdAt) as? Date) ?? Date()
                 let thumb = obj.value(forKey: KeyString.thumbnailData) as? Data
                 let bookmarkData = obj.value(forKey: KeyString.bookmarkData) as? Data
-                return RecentActivity(id: id, title: title, sourcePath: sourcePath, kind: kind, createdAt: createdAt, thumbnailData: thumb, bookmarkData: bookmarkData)
+                let wordCount = obj.value(forKey: KeyString.wordCount) as? Int
+                return RecentActivity(id: id, title: title, sourcePath: sourcePath, kind: kind, createdAt: createdAt, thumbnailData: thumb, bookmarkData: bookmarkData, wordCount: wordCount)
             }
             DispatchQueue.main.async {
                 self.items = mapped

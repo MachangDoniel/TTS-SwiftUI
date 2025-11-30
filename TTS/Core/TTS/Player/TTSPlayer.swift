@@ -43,6 +43,7 @@ final class TTSPlayer: NSObject, ObservableObject {
     // MARK: - Timeline Properties
     @Published var currentTime: TimeInterval = 0.0
     @Published var totalDuration: TimeInterval = 0.0
+    @Published var timeToComplete: TimeInterval = 0.0
     @Published var isSeekable: Bool = false
     @Published var estimatedSentenceDurations: [TimeInterval] = []
     
@@ -120,6 +121,7 @@ extension TTSPlayer {
         currentTitle = title
         progress = 0.0
         currentTime = 0.0
+        timeToComplete = 0.0
         state = .idle
         preparedContentId = makeContentId(text: trimmed, url: url, title: title)
     }
@@ -367,6 +369,8 @@ extension TTSPlayer {
         currentWordToken = nil
         position = .init(sentenceIndex: 0, wordNSRange: nil, wordIndex: nil)
         progress = 0.0
+        currentTime = 0.0
+        timeToComplete = 0.0
         state = .idle
         currentTitle = nil
         currentURL = nil
@@ -420,6 +424,9 @@ extension TTSPlayer {
                 currentTime = sentenceStartTime
                 startProgressTimer()
                 
+                // Update time to complete after moving to next sentence
+                updateTimeToComplete()
+                
                 // Step 5: Resume playing (button shows play, voice active, highlight active)
                 state = .playing
                 speakCurrentSentence_Apple()
@@ -439,6 +446,8 @@ extension TTSPlayer {
             position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
             state = .playing
             progress = Double(currentIndex) / Double(max(1, sentences.count))
+            // Update time to complete after moving to next sentence
+            updateTimeToComplete()
             backendWorker.playNext(from: currentIndex, sentences: sentences, player: self)
         }
     }
@@ -462,6 +471,9 @@ extension TTSPlayer {
             sentenceStartTime = getSentenceStartTime(currentIndex)
             currentTime = sentenceStartTime
             startProgressTimer()
+            
+            // Update time to complete after moving to previous sentence
+            updateTimeToComplete()
             
             state = .playing
             playCurrentSentence(resumeAt: currentIndex)
@@ -511,6 +523,9 @@ extension TTSPlayer {
                 currentTime = sentenceStartTime
                 startProgressTimer()
                 
+                // Update time to complete after moving to previous sentence
+                updateTimeToComplete()
+                
                 // Step 5: Resume playing (button shows play, voice active, highlight active)
                 state = .playing
                 speakCurrentSentence_Apple()
@@ -530,6 +545,8 @@ extension TTSPlayer {
             position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
             state = .playing
             progress = Double(currentIndex) / Double(max(1, sentences.count))
+            // Update time to complete after moving to previous sentence
+            updateTimeToComplete()
             backendWorker.playPrevious(from: currentIndex, sentences: sentences, player: self)
         }
     }
@@ -726,6 +743,8 @@ extension TTSPlayer: AVSpeechSynthesizerDelegate {
             position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
             lastPlayedContentId = preparedContentId
             state = .playing
+            // Update time to complete after sentence completion
+            updateTimeToComplete()
             playCurrentSentence(resumeAt: currentIndex)
         } else {
             // Finished last sentence - pause at end (not restart)
@@ -735,6 +754,8 @@ extension TTSPlayer: AVSpeechSynthesizerDelegate {
             state = .paused
             position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
             currentUtterance = nil
+            // Update time to complete (should be 0 when finished)
+            updateTimeToComplete()
         }
     }
     
@@ -908,6 +929,8 @@ extension TTSPlayer {
             self.sentenceStartTime = sentenceStartTime
             
             progress = Double(currentIndex) / Double(max(1, sentences.count))
+            // Update time to complete after seeking
+            updateTimeToComplete()
             state = .playing
             speakCurrentSentence_Apple()
             startProgressTimer()
@@ -945,6 +968,8 @@ extension TTSPlayer {
         position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
         state = .playing
         progress = Double(currentIndex) / Double(max(1, sentences.count))
+        // Update time to complete after seeking
+        updateTimeToComplete()
         
         // Start playing the sentence
         playFromCurrent()
@@ -991,21 +1016,52 @@ extension TTSPlayer {
     }
     
     func estimateTotalDuration() {
-        // Estimate duration based on text length and speech rate
-        let wordsPerMinute: Double = 150 // Average speaking rate
-        let totalWords = sentences.reduce(0) { sum, sentence in
-            sum + sentence.split(separator: " ").count
+        // Calculate total duration based on word count: 0.4 seconds per word
+        var totalWordCount = 0
+        for sentence in sentences {
+            let tokens = WordTokenizer.tokenize(sentence)
+            totalWordCount += tokens.count
         }
         
-        totalDuration = (Double(totalWords) / wordsPerMinute) * 60.0
+        // Total duration = total words * 0.4 seconds
+        totalDuration = 0.4 * Double(totalWordCount)
         
-        // Estimate per-sentence durations
+        // Estimate per-sentence durations for timeline
+        let wordsPerMinute: Double = 150 // Average speaking rate for timeline estimation
         estimatedSentenceDurations = sentences.map { sentence in
             let words = sentence.split(separator: " ").count
             return (Double(words) / wordsPerMinute) * 60.0
         }
         
         isSeekable = true
+        // Initialize timeToComplete at start (force update on initial load)
+        updateTimeToComplete(forceUpdate: true)
+    }
+    
+    func updateTimeToComplete(forceUpdate: Bool = false) {
+        guard !sentences.isEmpty else {
+            timeToComplete = 0.0
+            return
+        }
+        
+        // Count remaining words from currentIndex onwards
+        var remainingWordCount = 0
+        let startIndex = min(currentIndex, sentences.count)
+        
+        for i in startIndex..<sentences.count {
+            // Count words in each remaining sentence
+            let sentence = sentences[i]
+            let tokens = WordTokenizer.tokenize(sentence)
+            remainingWordCount += tokens.count
+        }
+        
+        // Calculate new time: 0.4 seconds per word
+        let newTimeToComplete = 0.4 * Double(remainingWordCount)
+        
+        // Update if forced (initial load) or if the difference is greater than 5 seconds
+        if forceUpdate || abs(newTimeToComplete - timeToComplete) > 5.0 {
+            timeToComplete = newTimeToComplete
+        }
     }
     
     private func startProgressTimer() {

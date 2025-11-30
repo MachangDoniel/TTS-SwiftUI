@@ -171,6 +171,8 @@ extension TTSBackendService {
                 player.state = .finished
                 player.currentWordInSentence = ""
                 player.currentWordRange = nil
+                // Update time to complete when finished (should be 0)
+                player.updateTimeToComplete()
             }
         }
     }
@@ -273,6 +275,8 @@ extension TTSBackendService {
             player.currentSentenceText = sentences[player.currentIndex]
             player.lastPlayedContentId = player.preparedContentId
             player.progress = Double(order) / Double(max(1, sentences.count))
+            // Update time to complete after moving to new sentence
+            player.updateTimeToComplete()
             audioPlayer?.play()
             player.state = .playing
             Logger.log("🔊 [Backend] Playing order \(order)/\(sentences.count)")

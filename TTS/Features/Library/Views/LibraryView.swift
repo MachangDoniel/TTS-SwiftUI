@@ -19,12 +19,6 @@ struct LibraryView: View {
     @State private var selectedDocumentItem: LibraryDocumentItem? = nil
     @EnvironmentObject private var tts: TTSPlayer
 
-    private let timeFormatter: DateFormatter = {
-        let df = DateFormatter()
-        df.dateFormat = "HH:mm"
-        return df
-    }()
-
     var body: some View {
         NavigationStack {
             ZStack {
@@ -69,7 +63,7 @@ struct LibraryView: View {
                                                     Logger.log("Unable to resolve local file for: \(item.title)")
                                                 }
                                             } label: {
-                                                RecentRow(item: item, timeFormatter: timeFormatter)
+                                                RecentRow(item: item)
                                                     .frame(maxWidth: .infinity, alignment: .leading)
                                                     .contentShape(Rectangle())
                                             }
