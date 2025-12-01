@@ -13,6 +13,7 @@ import UIKit
 struct LoginView: View {
     @EnvironmentObject var authVM: AuthViewModel
     @StateObject private var googleVM = GoogleAuthViewModel()
+    @State private var restorationCancellable: AnyCancellable? = nil
     
     var body: some View {
         VStack(spacing: 20) {
@@ -133,6 +134,19 @@ struct LoginView: View {
                 .padding(.horizontal)
         }
         .padding()
+        .onAppear {
+            restorationCancellable = NotificationCenter.default
+                .publisher(for: Notification.Name("GoogleSignInRestored"))
+                .receive(on: RunLoop.main)
+                .sink { notif in
+                    let user = notif.object as? GIDGoogleUser
+                    googleVM.handleRestoredSignIn(user: user)
+                }
+        }
+        .onDisappear {
+            restorationCancellable?.cancel()
+            restorationCancellable = nil
+        }
         .background(
             LinearGradient(
                 colors: [Color(.systemGroupedBackground), .white],

@@ -66,9 +66,11 @@ struct InputSourceTile: View {
                         .font(.system(size: 8, weight: .semibold))
                         .foregroundColor(.white)
                         .frame(alignment: .trailing)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
                         .background(Color.myPrimaryColor)
-                        .cornerRadius(5)
-                        .offset(y: -8)
+                        .cornerRadius(10)
+                        .offset(y: 0)
                 }
             }
             .aspectRatio(1, contentMode: .fit)
@@ -94,7 +96,7 @@ struct InputSourceTile: View {
                 InputSourceTile(icon: "folder.fill", title: "Files")
             }
             HStack {
-                InputSourceTile(icon: "folder.fill", title: "Files")
+                InputSourceTile(icon: "folder.fill", title: "Files", status: .comingSoon)
                 InputSourceTile(icon: "folder.fill", title: "Files")
                 InputSourceTile(icon: "folder.fill", title: "Files")
                 InputSourceTile(icon: "folder.fill", title: "Files")

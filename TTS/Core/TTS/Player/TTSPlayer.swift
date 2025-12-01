@@ -246,11 +246,18 @@ extension TTSPlayer {
                 
                 switch state {
                 case .playing:
+                    let frozenTime = getCurrentElapsedTime()
+                    stopProgressTimer()
+                    currentTime = frozenTime
                     synthesizer.pauseSpeaking(at: .immediate)
                     state = .paused
                 case .paused:
+                    let start = getSentenceStartTime(currentIndex)
+                    sentenceStartTime = start
+                    playbackStartTime = Date().addingTimeInterval(-(currentTime - start))
                     synthesizer.continueSpeaking()
                     state = .playing
+                    startProgressTimer()
                 case .idle, .finished:
                     currentIndex = 0
                     currentSentenceText = sentences.first ?? ""
@@ -297,8 +304,12 @@ extension TTSPlayer {
             switch state {
             case .playing:
                 backendWorker.pause()
+                let frozenTime = getCurrentElapsedTime()
+                stopProgressTimer()
+                currentTime = frozenTime
                 state = .paused
             case .paused:
+                startProgressTimer()
                 backendWorker.resume()
                 state = .playing
             case .idle, .finished:
@@ -580,11 +591,18 @@ extension TTSPlayer {
     private func toggleApplePlayPause() {
         switch state {
         case .playing:
+            let frozenTime = getCurrentElapsedTime()
+            stopProgressTimer()
+            currentTime = frozenTime
             synthesizer.pauseSpeaking(at: .immediate)
             state = .paused
         case .paused:
+            let start = getSentenceStartTime(currentIndex)
+            sentenceStartTime = start
+            playbackStartTime = Date().addingTimeInterval(-(currentTime - start))
             synthesizer.continueSpeaking()
             state = .playing
+            startProgressTimer()
         case .idle, .finished:
             // Reset to beginning when restarting from finished state
             if state == .finished {
@@ -786,8 +804,12 @@ extension TTSPlayer {
         switch state {
         case .playing:
             backendWorker.pause()
+            let frozenTime = getCurrentElapsedTime()
+            stopProgressTimer()
+            currentTime = frozenTime
             state = .paused
         case .paused:
+            startProgressTimer()
             backendWorker.resume()
             state = .playing
         case .idle, .finished:
@@ -1003,6 +1025,7 @@ extension TTSPlayer {
     }
     
     private func getCurrentElapsedTime() -> TimeInterval {
+        if state == .paused { return currentTime }
         switch appVoice {
         case .system:
             guard let startTime = playbackStartTime else { return currentTime }
@@ -1041,6 +1064,7 @@ extension TTSPlayer {
     func updateTimeToComplete(forceUpdate: Bool = false) {
         guard !sentences.isEmpty else {
             timeToComplete = 0.0
+            totalDuration = 0.0
             return
         }
         
@@ -1049,18 +1073,24 @@ extension TTSPlayer {
         let startIndex = min(currentIndex, sentences.count)
         
         for i in startIndex..<sentences.count {
-            // Count words in each remaining sentence
             let sentence = sentences[i]
             let tokens = WordTokenizer.tokenize(sentence)
             remainingWordCount += tokens.count
         }
         
-        // Calculate new time: 0.4 seconds per word
+        // Calculate new time to complete: 0.4 seconds per remaining word
         let newTimeToComplete = 0.4 * Double(remainingWordCount)
         
-        // Update if forced (initial load) or if the difference is greater than 5 seconds
+        // Update timeToComplete if forced (initial load) or if the difference is greater than 5 seconds
         if forceUpdate || abs(newTimeToComplete - timeToComplete) > 5.0 {
             timeToComplete = newTimeToComplete
+        }
+        
+        // Also update the overall totalDuration so the slider end reflects the latest estimate.
+        // New total estimate = elapsed time so far + remaining time.
+        let proposedTotalDuration = currentTime + newTimeToComplete
+        if forceUpdate || abs(proposedTotalDuration - totalDuration) > 5.0 {
+            totalDuration = proposedTotalDuration
         }
     }
     

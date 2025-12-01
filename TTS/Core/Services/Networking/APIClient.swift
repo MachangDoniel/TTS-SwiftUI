@@ -40,7 +40,7 @@ final class APIClient {
            let jsonString = String(data: requestData, encoding: .utf8) {
             Logger.debugPrint("➡️ REQUEST → \(method.rawValue) \(url)")
             Logger.debugPrint("📦 Body:")
-            print(jsonString)
+            Logger.debugPrint(jsonString)
         }
         
         // MARK: Send Request with Interceptor

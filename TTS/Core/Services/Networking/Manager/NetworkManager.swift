@@ -27,7 +27,7 @@ final class NetworkManager {
             // Print full request
             Logger.log("➡️ REQUEST to \(url):")
             if let requestBody = String(data: jsonData, encoding: .utf8) {
-                print(requestBody)
+                Logger.debugPrint(requestBody)
             }
 
             // Perform request
@@ -41,7 +41,7 @@ final class NetworkManager {
             // Print backend's full response message (exactly what it sent)
             if let responseString = String(data: data, encoding: .utf8) {
                 Logger.log("📩 Backend Response:")
-                print(responseString)
+                Logger.debugPrint(responseString)
             }
 
         } catch {

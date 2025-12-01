@@ -10,6 +10,7 @@ import SwiftUI
 
 extension Color {
     static let myPrimaryColor = Color(red: 67/255, green: 90/255, blue: 246/255)
+    static let secondaryTextBGColor = Color(red: 65/255, green: 51/255, blue: 42/255)
 }
 
 extension ShapeStyle where Self == Color {

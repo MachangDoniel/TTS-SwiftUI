@@ -9,8 +9,8 @@ import Foundation
 import AVFoundation
 import Combine
 
-struct AudioFile: Identifiable, Codable {
-    let id: String
+public struct AudioFile: Identifiable, Codable {
+    public let id: String
     let originalFileURL: URL
     let audioURL: URL
     let fileType: FileType
@@ -20,26 +20,6 @@ struct AudioFile: Identifiable, Codable {
     let duration: TimeInterval
     let fileSize: Int64
     let title: String
-    
-    enum FileType: String, CaseIterable, Codable {
-        case pdf, image, text
-        
-        var displayName: String {
-            switch self {
-            case .pdf: return "PDF"
-            case .image: return "Image"
-            case .text: return "Text"
-            }
-        }
-        
-        var icon: String {
-            switch self {
-            case .pdf: return "doc.fill"
-            case .image: return "photo.fill"
-            case .text: return "text.alignleft"
-            }
-        }
-    }
 }
 
 enum DownloadState: Equatable {
@@ -68,7 +48,7 @@ enum DownloadState: Equatable {
 struct FileContent {
     let url: URL
     let text: String
-    let type: AudioFile.FileType
+    let type: FileType
     let title: String
     
     var id: String {

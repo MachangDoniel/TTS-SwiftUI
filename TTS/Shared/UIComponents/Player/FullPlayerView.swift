@@ -18,7 +18,7 @@ struct FullPlayerView: View {
     
     let text: String
     let fileURL: URL?
-    let fileType: AudioFile.FileType?
+    let fileType: FileType?
     
     // Support legacy initializer
     init(tts: TTSPlayer, text: String) {
@@ -29,7 +29,7 @@ struct FullPlayerView: View {
     }
     
     // Enhanced initializer with file info for download
-    init(tts: TTSPlayer, text: String, fileURL: URL?, fileType: AudioFile.FileType?) {
+    init(tts: TTSPlayer, text: String, fileURL: URL?, fileType: FileType?) {
         self.tts = tts
         self.text = text
         self.fileURL = fileURL

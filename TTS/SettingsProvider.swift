@@ -97,7 +97,7 @@ final class SettingsProvider: ObservableObject {
             let info = try JSONDecoder().decode(GoogleUserInfo.self, from: data)
             loadFromGoogleUserInfo(info)
         } catch {
-            print("Failed to decode GoogleUserInfo from JSON: \(error)")
+            Logger.log("Failed to decode GoogleUserInfo from JSON: \(error)")
         }
     }
     
