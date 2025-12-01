@@ -11,9 +11,13 @@ struct MiniPlayerView: View {
     @ObservedObject var ttsPlayer: TTSPlayer
     let title: String
     var onTap: (() -> Void)? = nil
+    
+    @State private var dragOffset: CGFloat = 0
+    @State private var isDragging: Bool = false
 
     var body: some View {
         let isPlaying = (ttsPlayer.state == .playing)
+        let isPaused = (ttsPlayer.state == .paused)
         let subtitle = isPlaying ? "Playing" : "Paused"
 
         ZStack(alignment: .bottomLeading) {
@@ -63,12 +67,44 @@ struct MiniPlayerView: View {
             .shadow(color: Color.black.opacity(0.25), radius: 10, x: 0, y: 8)
             .contentShape(Rectangle())
             .onTapGesture { onTap?() }
+            .offset(x: isPaused ? dragOffset : 0)
+            .opacity(isPaused && isDragging ? max(0.0, 1.0 - Double(abs(dragOffset)) / 200.0) : 1.0)
+            .gesture(
+                isPaused ? DragGesture()
+                    .onChanged { value in
+                        // Allow horizontal swipes in both directions
+                        isDragging = true
+                        dragOffset = value.translation.width
+                    }
+                    .onEnded { value in
+                        isDragging = false
+                        
+                        // If swiped horizontally more than 100 points in either direction, dismiss
+                        if abs(value.translation.width) > 100 {
+                            // Continue the motion smoothly in the same direction
+                            let finalOffset: CGFloat = value.translation.width > 0 ? 400 : -400
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                dragOffset = finalOffset
+                            }
+                            // Stop after animation completes
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                ttsPlayer.stop()
+                            }
+                        } else {
+                            // Spring back if not swiped far enough
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                dragOffset = 0
+                            }
+                        }
+                    }
+                : nil
+            )
 
             // Progress bar at the bottom edge of the card
             Rectangle()
                 .fill(Color.accentColor)
                 .frame(height: 3)
-                .opacity(ttsPlayer.progress > 0 ? 1 : 0)
+                .opacity(ttsPlayer.progress > 0 ? 1.0 : 0.0)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .mask(
                     GeometryReader { geo in
@@ -84,3 +120,4 @@ struct MiniPlayerView: View {
         .accessibilityLabel("\(title), \(subtitle)")
     }
 }
+
