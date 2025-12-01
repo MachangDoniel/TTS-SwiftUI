@@ -26,6 +26,8 @@ struct HomeView: View {
     
     @State private var renamingItem: RecentActivity? = nil
     @State private var newTitle: String = ""
+    @State private var showDeleteConfirm: Bool = false
+    @State private var pendingDeleteItem: RecentActivity? = nil
 
     var body: some View {
         ZStack {
@@ -38,6 +40,19 @@ struct HomeView: View {
                 }
                 .padding(.bottom, 32)
             }
+        }
+        .alert(pendingDeleteItem != nil ? "Are you sure to delete \(pendingDeleteItem!.title)?" : "Are you sure to delete this item?", isPresented: $showDeleteConfirm) {
+            Button("Cancel", role: .cancel) {
+                pendingDeleteItem = nil
+            }
+            Button("Delete", role: .destructive) {
+                if let toDelete = pendingDeleteItem {
+                    recentStore.deleteItem(id: toDelete.id, removeFile: false)
+                }
+                pendingDeleteItem = nil
+            }
+        } message: {
+            Text("This action cannot be undone.")
         }
         .sheet(item: $renamingItem, onDismiss: { newTitle = "" }) { item in
             NavigationStack {
@@ -133,27 +148,40 @@ struct HomeView: View {
             } else {
                 VStack(spacing: 14) {
                     ForEach(recentStore.items) { item in
-                        Button(action: { openRecentItem(item) }) {
-                            RecentRow(item: item)
+                        HStack(alignment: .center, spacing: 8) {
+                            Button(action: { openRecentItem(item) }) {
+                                RecentRow(item: item)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(PlainButtonStyle())
+
+                            Menu {
+                                Button("Rename", systemImage: "pencil") {
+                                    renamingItem = item
+                                    newTitle = item.title
+                                }
+                                Button(role: .destructive) {
+                                    // Confirm delete via alert
+                                    renamingItem = nil
+                                    pendingDeleteItem = item
+                                    showDeleteConfirm = true
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .rotationEffect(.degrees(90))
+                                    .foregroundColor(.white)
+                                    .padding(8)
+                                    .background(Color.white.opacity(0.08))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            }
                         }
                         .padding(.horizontal, 20)
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) {
-                                recentStore.deleteItem(id: item.id, removeFile: false)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                            Button {
-                                renamingItem = item
-                                newTitle = item.title
-                            } label: {
-                                Label("Rename", systemImage: "pencil")
-                            }
-                            .tint(.blue)
-                        }
                     }
-                    .padding(.bottom, 16)
                 }
+                .padding(.bottom, 16)
             }
         }
         .background(Color(red: 0.10, green: 0.10, blue: 0.11))

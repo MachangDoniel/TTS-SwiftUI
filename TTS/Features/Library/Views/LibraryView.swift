@@ -17,7 +17,16 @@ struct LibraryView: View {
     @State private var selectedFilter: FileCategory = .all
     @State private var selectedDocumentURL: URL? = nil
     @State private var selectedDocumentItem: LibraryDocumentItem? = nil
+    @State private var actionItem: RecentActivity? = nil
+    @State private var showDeleteConfirm: Bool = false
+    @State private var renamingItem: RecentActivity? = nil
+    @State private var newTitle: String = ""
     @EnvironmentObject private var tts: TTSPlayer
+
+    private var deleteAlertTitle: String {
+        let name = actionItem?.title ?? "this item"
+        return "Are you sure to delete \(name)?"
+    }
 
     var body: some View {
         NavigationStack {
@@ -45,36 +54,52 @@ struct LibraryView: View {
 
                                     VStack(spacing: 12) {
                                         ForEach(filteredItems, id: \.id) { item in
-                                            Button {
-                                                var opened = false
-                                                if let bm = item.bookmarkData {
-                                                    var isStale = false
-                                                    if let resolved = try? URL(resolvingBookmarkData: bm, options: [], relativeTo: nil, bookmarkDataIsStale: &isStale),
-                                                       resolved.startAccessingSecurityScopedResource() {
-                                                        openRecentItem(url: resolved)
+                                            HStack(alignment: .center, spacing: 8) {
+                                                Button {
+                                                    var opened = false
+                                                    if let bm = item.bookmarkData {
+                                                        var isStale = false
+                                                        if let resolved = try? URL(resolvingBookmarkData: bm, options: [], relativeTo: nil, bookmarkDataIsStale: &isStale),
+                                                           resolved.startAccessingSecurityScopedResource() {
+                                                            openRecentItem(url: resolved)
+                                                            opened = true
+                                                        }
+                                                    }
+                                                    if !opened, let url = item.resolvedURL, url.isFileURL, FileManager.default.fileExists(atPath: url.path) {
+                                                        openRecentItem(url: url)
                                                         opened = true
                                                     }
+                                                    if !opened {
+                                                        Logger.log("Unable to resolve local file for: \(item.title)")
+                                                    }
+                                                } label: {
+                                                    RecentRow(item: item)
+                                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                                        .contentShape(Rectangle())
                                                 }
-                                                if !opened, let url = item.resolvedURL, url.isFileURL, FileManager.default.fileExists(atPath: url.path) {
-                                                    openRecentItem(url: url)
-                                                    opened = true
+                                                .buttonStyle(PlainButtonStyle())
+
+                                                Menu {
+                                                    Button("Rename", systemImage: "pencil") {
+                                                        renamingItem = item
+                                                        newTitle = item.title
+                                                    }
+                                                    Button(role: .destructive) {
+                                                        actionItem = item
+                                                        showDeleteConfirm = true
+                                                    } label: {
+                                                        Label("Delete", systemImage: "trash")
+                                                    }
+                                                } label: {
+                                                    Image(systemName: "ellipsis")
+                                                        .rotationEffect(.degrees(90))
+                                                        .foregroundColor(.white)
+                                                        .padding(8)
+                                                        .background(Color.white.opacity(0.08))
+                                                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                                                 }
-                                                if !opened {
-                                                    Logger.log("Unable to resolve local file for: \(item.title)")
-                                                }
-                                            } label: {
-                                                RecentRow(item: item)
-                                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                                    .contentShape(Rectangle())
                                             }
                                             .padding(.horizontal, 12)
-                                            .swipeActions(edge: .trailing) {
-                                                Button(role: .destructive) {
-                                                    recentStore.deleteItem(id: item.id, removeFile: false)
-                                                } label: {
-                                                    Label("Delete", systemImage: "trash")
-                                                }
-                                            }
                                         }
                                     }
                                     .padding(.bottom, 12)
@@ -89,6 +114,38 @@ struct LibraryView: View {
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 16)
+                .sheet(item: $renamingItem, onDismiss: { newTitle = "" }) { item in
+                    NavigationStack {
+                        Form {
+                            Section(header: Text("Rename")) {
+                                TextField("Title", text: $newTitle)
+                            }
+                        }
+                        .navigationTitle("Rename")
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Cancel") { renamingItem = nil }
+                            }
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Save") {
+                                    recentStore.rename(id: item.id, newTitle: newTitle)
+                                    renamingItem = nil
+                                }
+                            }
+                        }
+                    }
+                }
+                .alert(deleteAlertTitle, isPresented: $showDeleteConfirm) {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Delete", role: .destructive) {
+                        if let item = actionItem {
+                            recentStore.deleteItem(id: item.id, removeFile: false)
+                        }
+                        actionItem = nil
+                    }
+                } message: {
+                    Text("This action cannot be undone.")
+                }
             }
             .fullScreenCover(item: $selectedDocumentItem) { item in
                 FileViewer(fileURL: item.url, tts: tts)
@@ -132,4 +189,3 @@ struct LibraryView: View {
             .preferredColorScheme(.dark)
     }
 }
-
