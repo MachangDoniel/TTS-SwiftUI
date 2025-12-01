@@ -20,7 +20,6 @@ struct ReadOnlyAccurateHighlight: View {
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Color.black)
     }
     
     private func makeHighlightedAttributedString() -> AttributedString {

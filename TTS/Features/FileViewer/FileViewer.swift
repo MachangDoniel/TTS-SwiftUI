@@ -40,13 +40,14 @@ struct FileViewer: View {
                 FileViewerHeader(
                     title: fileURL.lastPathComponent,
                     isEditing: !isReadOnly,
+                    isTextFile: TTSUtility.isTextFile(url: tts.currentURL ?? URL(fileURLWithPath: "")),
                     onClose: {
                         // Dismiss without stopping TTS
                         dismiss()
                     },
                     onTextSettings: {
                         // Toggle background color to red
-                        backgroundColor = backgroundColor == .black ? .red : .black
+                        backgroundColor = backgroundColor == .black ? Color.secondaryTextBGColor : .black
                     },
                     onEdit: {
                         // Enable editing for all file types
@@ -56,7 +57,8 @@ struct FileViewer: View {
                         // Save and exit edit mode
                         saveFile()
                         isReadOnly = true
-                    }
+                    },
+                    backgroundColor: backgroundColor
                 )
                 .frame(height: 60)
                 
@@ -156,6 +158,7 @@ struct FileViewer: View {
                     // Read-only view
                     if fileURL.pathExtension.lowercased() == "pdf" {
                         PDFKitView(url: fileURL, tts: tts)
+                            .background(backgroundColor)
                             .onAppear {
                                 if let doc = PDFDocument(url: fileURL) {
                                     highlightCoordinator.setDocument(.pdf(document: doc))
@@ -183,14 +186,17 @@ struct FileViewer: View {
                         }
                     } else if fileURL.pathExtension.lowercased() == "txt" {
                         ReadOnlyAccurateHighlight(fullText: editedText.isEmpty ? extractedText : editedText, tts: tts)
+                            .background(backgroundColor)
                     } else {
                         Text("Unsupported file type")
                             .foregroundColor(.gray)
                             .padding()
+                            .background(backgroundColor)
                     }
                 } else {
                     // Editable view - show text editor for all file types
                     TextEditor(text: $editedText)
+                        .scrollContentBackground(.hidden)
                         .focused($isTextEditorFocused)
                         .padding()
                         .background(backgroundColor)
@@ -224,21 +230,10 @@ struct FileViewerTTSControlWrapper: View {
             tts: tts,
             text: text,
             fileURL: fileURL,
-            fileType: determineFileType(from: fileURL)
+            fileType: TTSUtility.determineFileType(from: fileURL)
         )
     }
     
-    private func determineFileType(from url: URL) -> AudioFile.FileType {
-        let ext = url.pathExtension.lowercased()
-        switch ext {
-        case "pdf":
-            return .pdf
-        case "png", "jpg", "jpeg", "heic":
-            return .image
-        default:
-            return .text
-        }
-    }
 }
 
 extension FileViewer {
