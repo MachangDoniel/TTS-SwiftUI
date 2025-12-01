@@ -215,7 +215,7 @@ final class AuthViewModel: ObservableObject {
 
 // MARK: - Token Persistence
 extension AuthViewModel {
-    private var tokenKey: String { "com.tts.accessTokenData" }
+    private var tokenKey: String { KeyString.tokenKey }
 
     func saveTokenData() {
         guard let tokenData else { return }
