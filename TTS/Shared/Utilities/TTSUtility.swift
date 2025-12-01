@@ -8,7 +8,7 @@
 import Foundation
 
 public struct TTSUtility {
-    public static func determineFileType(from url: URL) -> AudioFile.FileType {
+    public static func determineFileType(from url: URL) -> FileType {
         let ext = url.pathExtension.lowercased()
         switch ext {
         case "pdf":

@@ -14,7 +14,7 @@ struct AudioTimelineControls: View {
     
     let fileURL: URL?
     let text: String
-    let fileType: AudioFile.FileType
+    let fileType: FileType
     
     var body: some View {
         VStack(spacing: 12) {

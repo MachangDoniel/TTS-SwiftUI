@@ -48,7 +48,7 @@ enum DownloadState: Equatable {
 struct FileContent {
     let url: URL
     let text: String
-    let type: AudioFile.FileType
+    let type: FileType
     let title: String
     
     var id: String {
