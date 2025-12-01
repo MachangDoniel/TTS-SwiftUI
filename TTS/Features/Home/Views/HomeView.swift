@@ -61,31 +61,13 @@ struct HomeView: View {
             }
         }
     }
-
-    // MARK: - Header
+    
     private var header: some View {
-        HeaderPager( items: [
-            BannerItem(
-                imageName: BannerAssets.scan_banner_img,
-                buttonTitle: "Try Now",
-                onTap: { onScan?() }
-            ),
-            BannerItem(
-                imageName: BannerAssets.link_banner_img,
-                buttonTitle: "Listen Now",
-                onTap: { onPasteLink?() }
-            ),
-            BannerItem(
-                imageName: BannerAssets.text_banner_img,
-                buttonTitle: "Try Now",
-                onTap: { onTypeText?() }
-            )
-            
-        ]
-        
+        HomeBannerView(
+            onScan: onScan,
+            onPasteLink: onPasteLink,
+            onTypeText: onTypeText
         )
-            .frame(height: 160)
-            .padding(.top, 8)
     }
 
     // MARK: - Import & Listen Section

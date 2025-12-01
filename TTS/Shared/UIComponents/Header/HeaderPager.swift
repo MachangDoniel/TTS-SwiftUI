@@ -7,14 +7,8 @@
 
 import SwiftUI
 
-enum BannerAssets {
-    static let scan_banner_img = "voice_banner"
-    static let link_banner_img = "voice_banner_x2"
-    static let text_banner_img = "voice_banner_x3"
-}
-
 struct BannerItem: Identifiable {
-    let id = UUID()
+    let id: String
     let imageName: String
     let buttonTitle: String
     let onTap: () -> Void
@@ -25,7 +19,6 @@ struct HeaderPager: View {
 
     var body: some View {
         TabView {
-
             ForEach(items) { item in
                 BannerSlide(
                     imageName: item.imageName,
@@ -42,16 +35,19 @@ struct HeaderPager: View {
 #Preview {
     HeaderPager(items: [
         BannerItem(
+            id: "scan-banner",
             imageName: BannerAssets.scan_banner_img,
             buttonTitle: "Try Now",
             onTap: { print("Scan tapped") }
         ),
         BannerItem(
+            id: "link-banner",
             imageName: BannerAssets.link_banner_img,
             buttonTitle: "Listen Now",
             onTap: { print("Link tapped") }
         ),
         BannerItem(
+            id: "text-banner",
             imageName: BannerAssets.text_banner_img,
             buttonTitle: "Try Now",
             onTap: { print("Text tapped") }

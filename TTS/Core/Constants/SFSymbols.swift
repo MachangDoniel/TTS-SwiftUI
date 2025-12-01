@@ -11,4 +11,5 @@ public struct SFSymbols {
     static let save: String = "square.and.pencil"
     static let edit: String = "arrow.down.document"
     static let dismiss: String = "chevron.down"
+    static let refresh: String = "arrow.clockwise"
 }
