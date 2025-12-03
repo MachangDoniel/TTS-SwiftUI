@@ -66,7 +66,7 @@ struct InputSourceTile: View {
                         .font(.system(size: 8, weight: .semibold))
                         .foregroundColor(.white)
                         .frame(alignment: .trailing)
-                        .padding(.horizontal, 5)
+                        .padding(.horizontal, 3)
                         .padding(.vertical, 2)
                         .background(Color.myPrimaryColor)
                         .cornerRadius(10)
