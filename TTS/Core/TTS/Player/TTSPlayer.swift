@@ -39,6 +39,7 @@ final class TTSPlayer: NSObject, ObservableObject {
     @Published var appVoice: AppVoiceMode = .system
     @Published var selectedVoiceSampleId: String = "com.apple.voice.super-compact.en-US.Samantha"
     @Published var selectedVoiceName: String = "Samantha"
+    @Published var disableHighlighting: Bool = false
     
     // MARK: - Timeline Properties
     @Published var currentTime: TimeInterval = 0.0
@@ -130,6 +131,7 @@ extension TTSPlayer {
         timeToComplete = 0.0
         state = .idle
         preparedContentId = makeContentId(text: trimmed, url: url, title: title)
+        disableHighlighting = false
         
         // Auto-detect language and switch voice if enabled
         autoDetectLanguageAndSwitchVoice(for: trimmed)
@@ -397,6 +399,7 @@ extension TTSPlayer {
         currentURL = nil
         preparedContentId = nil
         lastPlayedContentId = nil
+        disableHighlighting = false
     }
     
     func nextSentence() {
@@ -1237,6 +1240,13 @@ extension TTSPlayer {
             return
         }
         
+        let isEnglish = (detectedLanguageCode.lowercased() == "en") || detectedLanguageCode.lowercased().hasPrefix("en-") || detectedLanguageCode.lowercased().hasPrefix("en_")
+        if !isEnglish {
+            disableHighlighting = true
+        } else {
+            disableHighlighting = false
+        }
+        
         // Get current voice to check if it already matches
         let voiceCatalog = VoiceCatalog.shared
         let currentVoice = voiceCatalog.voices.first { $0.voiceSampleId == selectedVoiceSampleId }
@@ -1315,6 +1325,11 @@ extension TTSPlayer {
         guard let detectedLanguageCode = LanguageDetection.detectLanguage(from: sentence) else {
             Logger.log("ℹ️ Language detection failed for sentence \(sentenceIndex + 1), keeping current voice")
             return nil
+        }
+        
+        let lc = detectedLanguageCode.lowercased()
+        if !(lc == "en" || lc.hasPrefix("en-") || lc.hasPrefix("en_")) {
+            disableHighlighting = true
         }
         
         // Cache the detected language

@@ -26,7 +26,8 @@ struct ReadOnlyAccurateHighlight: View {
         var attr = AttributedString(fullText)
         
         // Only highlight when actively playing, not when paused or idle
-        guard tts.state == .playing,
+        guard !tts.disableHighlighting,
+              tts.state == .playing,
               tts.currentIndex < tts.sentences.count,
               tts.currentIndex < tts.wordTokens.count else {
             return attr
