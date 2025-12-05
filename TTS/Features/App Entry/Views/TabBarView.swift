@@ -285,7 +285,7 @@ struct TabBarView: View {
                 .padding(.bottom, 56) // keep above the tab bar (approx 49) + spacing
             }
         }
-        .background(Color.black.ignoresSafeArea())
+        .background(Color(hex: "#1C1C1E").ignoresSafeArea())
     }
 
     func copyToLocal(url: URL) -> URL? {
@@ -338,3 +338,4 @@ struct TabBarView: View {
 #Preview {
     TabBarView()
 }
+

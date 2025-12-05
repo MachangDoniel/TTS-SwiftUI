@@ -5,7 +5,6 @@
 //  Created by Doniel Tripura on 10/20/25.
 //
 
-
 import SwiftUI
 
 struct TextInputView: View {
@@ -22,28 +21,53 @@ struct TextInputView: View {
         VStack(spacing: 0) {
 
             // MARK: - Top Bar (only show in editable mode)
-            if !isReadOnly {
-                HStack {
-                    Button("Cancel") {
-                        cancelAndDismiss()
-                    }
-                    .foregroundColor(.white)
-
-                    Spacer()
-
-                    Button("Save File") {
-                        saveAndConvertToReadOnly()
-                    }
-                    .foregroundColor(.myPrimaryColor)
+            HStack {
+                Button("Cancel") {
+                    cancelAndDismiss()
                 }
-                .padding()
-                .background(Color.black)
+                .foregroundColor(.white)
+
+                Spacer()
+
+                Button("Save File") {
+                    saveAndConvertToReadOnly()
+                }
+                .foregroundColor(.myPrimaryColor)
             }
+            .padding()
+            .background(Color.black)
 
             // MARK: - Content Area
             if isReadOnly {
-                // Read-only mode: Show accurate word + sentence highlighting
-                ReadOnlyAccurateHighlight(fullText: inputText, tts: tts)
+                ZStack(alignment: .bottomTrailing) {
+                    ReadOnlyAccurateHighlight(fullText: inputText, tts: tts)
+
+                    Button {
+                        isReadOnly = false
+                    } label: {
+                        Text("Edit")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Color.white.opacity(0.2)
+                                
+//                                LinearGradient(
+//                                    colors: [Color.blue.opacity(0.9), Color.purple.opacity(0.9)],
+//                                    startPoint: .topLeading,
+//                                    endPoint: .bottomTrailing
+//                                )
+                            )
+                            .cornerRadius(14)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                            )
+                            .shadow(color: Color.black.opacity(0.5), radius: 8, x: 0, y: 4)
+                    }
+                    .padding()
+//                    .accessibilityLabel("Edit")
+                }
             } else {
                 // Editable mode: Show TextEditor with sentence-only highlighting
                 ZStack(alignment: .topLeading) {
@@ -74,8 +98,19 @@ struct TextInputView: View {
             }
 
             // MARK: - TTS Controls
-            FullPlayerView(tts: tts, text: inputText)
-                .background(Color.black)
+            FullPlayerView(tts: tts, text: inputText, onTogglePlayPause: {
+                // Switch to read-only mode when play/pause is tapped
+                isReadOnly = true
+
+                let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return }
+
+                // If nothing is prepared yet, prepare without auto-start
+                if tts.sentences.isEmpty {
+                    tts.prepareNewFileOnly(text: trimmed, url: nil, title: "Unsaved Text")
+                }
+            })
+            .background(Color.black)
         }
         .background(Color.black.ignoresSafeArea())
         .preferredColorScheme(.dark)

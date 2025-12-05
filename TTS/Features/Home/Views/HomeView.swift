@@ -31,15 +31,17 @@ struct HomeView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea() // base dark background
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 24) {
+                VStack(spacing: 5) {
                     header
                     importSection
                     recentSection
                 }
                 .padding(.bottom, 32)
             }
+            .background(
+                Color(hex: Color.primaryBackgroundColor).ignoresSafeArea()
+            )
         }
         .alert(pendingDeleteItem != nil ? "Are you sure to delete \(pendingDeleteItem!.title)?" : "Are you sure to delete this item?", isPresented: $showDeleteConfirm) {
             Button("Cancel", role: .cancel) {
@@ -111,9 +113,10 @@ struct HomeView: View {
             .padding(.horizontal, 10)
             .padding(.bottom, 10)
         }
-        .background(Color(red: 0.10, green: 0.10, blue: 0.11))
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .padding(.horizontal, 16)
+        .background(Color(hex: Color.secondaryBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 0)
     }
 
     // MARK: - Recent Section
@@ -185,8 +188,8 @@ struct HomeView: View {
             }
         }
         .background(Color(red: 0.10, green: 0.10, blue: 0.11))
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .padding(.horizontal, 16)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(.horizontal, 12)
     }
     
     // Unified open flow for recent items: stop previous TTS, prepare new file (paused), then delegate navigation
@@ -216,7 +219,7 @@ struct HomeView: View {
 
 #Preview {
     ZStack {
-        Color.black.ignoresSafeArea()
+        Color(hex: "#1C1C1E").ignoresSafeArea()
         HomeView()
             .environmentObject(RecentStore())
     }
