@@ -34,7 +34,7 @@ struct ProfileView: View {
                     settingsSection
                     
                     // MARK: Logout
-                    logoutButton
+//                    logoutButton
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 24)
@@ -182,16 +182,16 @@ struct ProfileView: View {
     // MARK: - Settings Section
     private var settingsSection: some View {
         VStack(spacing: 0) {
-            SettingsRow(title: "Send Feedbacks", action: {
-                feedbackTitle = "Send Feedback"
-                showFeedbackPopup = true
-            })
-            Divider().background(Color.white.opacity(0.1))
-            SettingsRow(title: "Request for Feature", action: {
-                feedbackTitle = "Request Feature"
-                showFeedbackPopup = true
-            })
-            Divider().background(Color.white.opacity(0.1))
+//            SettingsRow(title: "Send Feedbacks", action: {
+//                feedbackTitle = "Send Feedback"
+//                showFeedbackPopup = true
+//            })
+//            Divider().background(Color.white.opacity(0.1))
+//            SettingsRow(title: "Request for Feature", action: {
+//                feedbackTitle = "Request Feature"
+//                showFeedbackPopup = true
+//            })
+//            Divider().background(Color.white.opacity(0.1))
 //            SettingsRow(title: "Review on the App Store", action: { requestAppReview() })
 //            Divider().background(Color.white.opacity(0.1))
 //            SettingsRow(title: "Share with Friends", action: { isShowingShareSheet = true })

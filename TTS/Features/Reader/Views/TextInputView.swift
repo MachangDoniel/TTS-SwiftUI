@@ -65,10 +65,10 @@ struct TextInputView: View {
                     
                     // Sentence highlighting overlay (only when playing)
                     if !tts.sentences.isEmpty && tts.isSpeaking && !inputText.isEmpty {
-                        EditableSentenceHighlight(fullText: inputText, tts: tts)
-                            .allowsHitTesting(false)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 8)
+//                        EditableSentenceHighlight(fullText: inputText, tts: tts)
+//                            .allowsHitTesting(false)
+//                            .padding(.horizontal, 10)
+//                            .padding(.vertical, 8)
                     }
                 }
             }
