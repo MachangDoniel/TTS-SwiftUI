@@ -233,7 +233,7 @@ struct FullPlayerView: View {
                         .font(.title2)
                 }
                 .disabled(true)
-                .opacity(0.4)
+                .opacity(0)
             }
             .padding(.horizontal)
             .foregroundColor(.white)

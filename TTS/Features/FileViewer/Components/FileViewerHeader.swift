@@ -70,13 +70,18 @@ struct FileViewerHeader: View {
                 // Edit/Save button
                 if isTextFile {
                     Button(action: isEditing ? onSave : onEdit) {
-                        Image(systemName: isEditing ? SFSymbols.edit : SFSymbols.save)
+//                        Image(systemName: isEditing ? SFSymbols.edit : SFSymbols.save)
+//                            .font(.system(size: 16, weight: .medium))
+//                            .foregroundColor(.white)
+//                            .frame(width: 44, height: 44)
+                        Text(isEditing ? "Save" : "Edit")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.white)
                             .frame(width: 44, height: 44)
                     }
                 }
             }
+            .padding(.trailing, 10)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 8)
