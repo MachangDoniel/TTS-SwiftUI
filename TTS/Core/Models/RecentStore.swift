@@ -405,7 +405,38 @@ final class RecentStore: ObservableObject {
         
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
-        request.recognitionLanguages = ["en-US", "bn-BD", "hi-IN"]
+        
+        // Configure languages: broaden coverage and filter to what's supported on this device
+        let desiredLanguages = [
+            // English + common Latin
+            "en-US", "en-GB", "fr", "de", "es", "it", "pt", "nl", "sv", "da", "no", "fi", "pl", "cs", "sk", "sl", "hr", "ro", "hu",
+            // Central/Eastern European (Latin)
+            "tr", "id", "ms", "vi",
+            // Cyrillic
+            "ru", "uk", "bg", "sr", "mk",
+            // Greek
+            "el",
+            // Hebrew/Arabic/Persian
+            "he", "ar", "fa",
+            // East Asian
+            "zh-Hans", "zh-Hant", "ja", "ko",
+            // South Asian (Indic)
+            "hi", "bn", "ur", "ta", "te", "mr", "gu", "pa", "kn", "ml", "or", "as",
+            // Southeast Asian additional
+            "th", "km", "lo"
+        ]
+        let supported = try? VNRecognizeTextRequest.supportedRecognitionLanguages(for: .accurate, revision: VNRecognizeTextRequest.currentRevision)
+        if let supported = supported {
+            let languagesToUse = desiredLanguages.filter { supported.contains($0) }
+            if !languagesToUse.isEmpty {
+                request.recognitionLanguages = languagesToUse
+            }
+            Logger.log("[RecentStore] Supported OCR languages: \(supported)")
+            Logger.log("[RecentStore] Using OCR languages: \(languagesToUse)")
+        } else {
+            // If we can't query, let Vision auto-detect by not setting recognitionLanguages
+            Logger.log("[RecentStore] Could not query supported OCR languages; using auto-detect.")
+        }
         
         DispatchQueue.global(qos: .userInitiated).async {
             let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])

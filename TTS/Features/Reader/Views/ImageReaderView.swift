@@ -56,7 +56,7 @@ struct ImageReaderView: View {
                                 .position(x: geo.size.width / 2, y: geo.size.height / 2)
 
                             ForEach(wordBoxes, id: \.id) { box in
-                                if !tts.disableHighlighting && isCurrentWord(box.text) {
+                                if isCurrentWord(box.text) {
                                     RoundedRectangle(cornerRadius: 4)
                                         .fill(Color.myPrimaryColor.opacity(0.4))
                                         .frame(
