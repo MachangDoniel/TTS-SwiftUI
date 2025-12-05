@@ -62,16 +62,22 @@ struct FullPlayerView: View {
                 //                )
                 MySlider(
                     value: isDragging ? $dragValue : Binding(
-                        get: { tts.currentTime },
+                        get: {
+                            let upper = max(1, tts.totalDuration)
+                            return min(max(tts.currentTime, 0), upper)
+                        },
                         set: { dragValue = $0 }
                     ),
                     range: 0...max(1, tts.totalDuration),
                     onEditingChanged: { editing in
                         if editing {
                             isDragging = true
-                            dragValue = tts.currentTime
+                            let upper = max(1, tts.totalDuration)
+                            dragValue = min(max(tts.currentTime, 0), upper)
                         } else {
-                            tts.seek(to: dragValue)
+                            let upper = max(1, tts.totalDuration)
+                            let clamped = min(max(dragValue, 0), upper)
+                            tts.seek(to: clamped)
                             isDragging = false
                         }
                     }
@@ -81,7 +87,7 @@ struct FullPlayerView: View {
                 .disabled(!tts.isSeekable)
                 
                 //                // Sentence progress indicators (skinnier)
-                //                if !tts.sentences.isEmpty && tts.isSeekable {
+                //                if !tts.disableHighlighting && !tts.sentences.isEmpty && tts.isSeekable {
                 //                    GeometryReader { geometry in
                 //                        HStack(spacing: 0) {
                 //                            ForEach(0..<tts.sentences.count, id: \.self) { index in
@@ -99,7 +105,7 @@ struct FullPlayerView: View {
             
             // Time display: current time (left), sentence counter (middle), total time (right)
             HStack {
-                Text(formatTime(tts.currentTime))
+                Text(formatTime(min(max(tts.currentTime, 0), max(1, tts.totalDuration))))
                     .font(.caption)
                     .foregroundColor(.gray)
                 
@@ -290,7 +296,8 @@ struct MySlider: View {
     var body: some View {
         GeometryReader { geo in
             let width = geo.size.width
-            let progress = CGFloat((value - range.lowerBound) / (range.upperBound - range.lowerBound))
+            let clampedValue = min(max(value, range.lowerBound), range.upperBound)
+            let progress = CGFloat((clampedValue - range.lowerBound) / (range.upperBound - range.lowerBound))
             let thumbX = width * progress
 
             ZStack(alignment: .leading) {
@@ -317,7 +324,8 @@ struct MySlider: View {
                             .onChanged { gesture in
                                 let location = min(max(0, gesture.location.x), width)
                                 let percent = location / width
-                                let newValue = range.lowerBound + Double(percent) * (range.upperBound - range.lowerBound)
+                                let unclamped = range.lowerBound + Double(percent) * (range.upperBound - range.lowerBound)
+                                let newValue = min(max(unclamped, range.lowerBound), range.upperBound)
 
                                 isDragging = true
                                 onEditingChanged(true)
@@ -343,3 +351,4 @@ struct MySlider: View {
     )
     .background(Color.black)
 }
+

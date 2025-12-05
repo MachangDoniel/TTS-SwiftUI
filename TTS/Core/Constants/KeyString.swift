@@ -25,4 +25,5 @@ public struct KeyString {
     static let selectedVoiceSampleId = "selectedVoiceSampleId"
     static let selectedVoiceName = "selectedVoiceName"
     static let tokenKey = "com.tts.accessTokenData"
+    static let autoDetectLanguage = "autoDetectLanguage"
 }

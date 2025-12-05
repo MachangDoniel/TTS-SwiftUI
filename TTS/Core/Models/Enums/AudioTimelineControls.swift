@@ -123,7 +123,7 @@ struct TimelineSlider: View {
             .disabled(!tts.isSeekable)
             
             // Progress indicators (sentences)
-            if !tts.sentences.isEmpty && tts.isSeekable {
+            if !tts.sentences.isEmpty && tts.isSeekable && !tts.disableHighlighting {
                 GeometryReader { geometry in
                     HStack(spacing: 0) {
                         ForEach(0..<tts.sentences.count, id: \.self) { index in

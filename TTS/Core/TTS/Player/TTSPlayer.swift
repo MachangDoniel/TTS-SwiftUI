@@ -39,6 +39,7 @@ final class TTSPlayer: NSObject, ObservableObject {
     @Published var appVoice: AppVoiceMode = .system
     @Published var selectedVoiceSampleId: String = "com.apple.voice.super-compact.en-US.Samantha"
     @Published var selectedVoiceName: String = "Samantha"
+    @Published var disableHighlighting: Bool = false
     
     // MARK: - Timeline Properties
     @Published var currentTime: TimeInterval = 0.0
@@ -54,6 +55,9 @@ final class TTSPlayer: NSObject, ObservableObject {
     // MARK: - Word Tokenization
     var wordTokens: [[WordToken]] = []  // Pre-tokenized words per sentence
     
+    // MARK: - Language Detection Cache
+    private var detectedLanguagesCache: [Int: String] = [:]  // Cache detected language codes per sentence index
+    
     // MARK: - Dependencies
     private let config: TTSConfiguration
     private let parser = TTSSentenceParser()
@@ -64,6 +68,9 @@ final class TTSPlayer: NSObject, ObservableObject {
     
     // MARK: - Utterance Tracking
     private var currentUtterance: AVSpeechUtterance?
+    
+    // MARK: - Voice Switching Guard
+    private var isStartingPlayback: Bool = false  // Prevents nested calls during voice switching
     
     // MARK: - Timeline Management
     private var progressTimer: Timer?
@@ -124,6 +131,10 @@ extension TTSPlayer {
         timeToComplete = 0.0
         state = .idle
         preparedContentId = makeContentId(text: trimmed, url: url, title: title)
+        disableHighlighting = false
+        
+        // Auto-detect language and switch voice if enabled
+        autoDetectLanguageAndSwitchVoice(for: trimmed)
     }
     
     /// Prepare a new file for playback (reset voice + highlight) but do NOT start speaking.
@@ -372,6 +383,7 @@ extension TTSPlayer {
         
         sentences.removeAll()
         wordTokens.removeAll()
+        detectedLanguagesCache.removeAll()
         currentIndex = 0
         currentSentenceText = ""
         currentWordInSentence = ""
@@ -387,6 +399,7 @@ extension TTSPlayer {
         currentURL = nil
         preparedContentId = nil
         lastPlayedContentId = nil
+        disableHighlighting = false
     }
     
     func nextSentence() {
@@ -439,8 +452,9 @@ extension TTSPlayer {
                 updateTimeToComplete()
                 
                 // Step 5: Resume playing (button shows play, voice active, highlight active)
+                // Use playCurrentSentence to ensure detection happens before speaking
                 state = .playing
-                speakCurrentSentence_Apple()
+                playCurrentSentence(resumeAt: currentIndex)
                 
                 // Clear the task reference when done
                 skipTask = nil
@@ -538,8 +552,9 @@ extension TTSPlayer {
                 updateTimeToComplete()
                 
                 // Step 5: Resume playing (button shows play, voice active, highlight active)
+                // Use playCurrentSentence to ensure detection happens before speaking
                 state = .playing
-                speakCurrentSentence_Apple()
+                playCurrentSentence(resumeAt: currentIndex)
                 
                 // Clear the task reference when done
                 skipTask = nil
@@ -573,6 +588,9 @@ extension TTSPlayer {
         // Always update currentSentenceText when starting playback to sync highlight
         currentSentenceText = sentence
         
+        // Voice should already be set correctly before this method is called
+        // Do not detect/switch voice here to avoid interrupting mid-sentence playback
+        
         let utterance = AVSpeechUtterance(string: sentence)
         if let sysVoice = AVSpeechSynthesisVoice(identifier: selectedVoiceSampleId) {
             utterance.voice = sysVoice
@@ -595,6 +613,12 @@ extension TTSPlayer {
             stopProgressTimer()
             currentTime = frozenTime
             synthesizer.pauseSpeaking(at: .immediate)
+            // Clear word highlighting when pausing
+            currentWordInSentence = ""
+            currentWordRange = nil
+            currentWordIndexInSentence = nil
+            currentWordToken = nil
+            position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
             state = .paused
         case .paused:
             let start = getSentenceStartTime(currentIndex)
@@ -641,7 +665,8 @@ extension TTSPlayer {
                 currentWordInSentence = ""
                 currentWordRange = nil
                 currentWordToken = nil
-                speakCurrentSentence_Apple()
+                // Use playCurrentSentence to ensure detection happens before speaking
+                playCurrentSentence(resumeAt: currentIndex)
                 state = .playing
             }
         default:
@@ -664,11 +689,26 @@ extension TTSPlayer {
             )
             return
         }
-        if oldId != voiceId || state == .playing || state == .paused {
+        
+        // Don't restart playback if we're already in the process of starting a sentence
+        // This prevents duplicate playback when voice switching is triggered during sentence start
+        guard !isStartingPlayback else {
+            Logger.log("ℹ️ Skipping voice restart - already starting playback")
+            return
+        }
+        
+        // Only restart if voice actually changed and we're currently playing/paused
+        // Don't restart if we're idle (about to start) - let playCurrentSentence handle it
+        if oldId != voiceId && (state == .playing || state == .paused) {
             synthesizer.stopSpeaking(at: .immediate)
+            currentUtterance = nil
+            // Clear word tracking when voice changes
             currentWordInSentence = ""
             currentWordRange = nil
+            currentWordIndexInSentence = nil
             currentWordToken = nil
+            position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
+            // Voice has already been switched, just restart playback with new voice
             speakCurrentSentence_Apple()
             if state == .playing {
                 state = .playing
@@ -687,12 +727,30 @@ extension TTSPlayer: AVSpeechSynthesizerDelegate {
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer,
                            willSpeakRangeOfSpeechString range: NSRange,
                            utterance: AVSpeechUtterance) {
-        // Ensure we're processing the correct utterance for the current sentence
-        // This prevents stale delegate callbacks from old utterances after skipping
+        // Layer 1: Identity check - is this the utterance we're currently tracking?
+        guard utterance === currentUtterance else {
+            // This is a callback from an old utterance that was cancelled
+            return
+        }
+        
+        // Layer 2: Ensure we're actively playing (not paused)
+        guard state == .playing else {
+            // Don't update highlights when paused
+            return
+        }
+        
+        // Layer 3: Validate sentence index and content
         guard currentIndex < sentences.count else { return }
         let currentSentence = sentences[currentIndex].trimmingCharacters(in: .whitespacesAndNewlines)
         guard utterance.speechString == currentSentence else {
             // This is a callback for an old utterance that's being cancelled
+            return
+        }
+        
+        // Layer 4: Validate range is valid
+        guard range.location != NSNotFound,
+              range.location >= 0,
+              range.location + range.length <= utterance.speechString.count else {
             return
         }
         
@@ -710,13 +768,25 @@ extension TTSPlayer: AVSpeechSynthesizerDelegate {
         let sentenceTokens = wordTokens[currentIndex]
         // Find the matching word token using accurate matching algorithm
         if let matchedToken = WordTokenizer.findWordToken(by: range, in: sentenceTokens) {
+            // Validate matched token is valid
+            guard matchedToken.range.location >= 0,
+                  matchedToken.range.location + matchedToken.range.length <= currentSentence.count,
+                  matchedToken.index >= 0,
+                  matchedToken.index < sentenceTokens.count else {
+                return
+            }
+            
             currentWordToken = matchedToken
             currentWordRange = matchedToken.range
             currentWordInSentence = matchedToken.text
             currentWordIndexInSentence = matchedToken.index
             position = .init(sentenceIndex: currentIndex, wordNSRange: matchedToken.range, wordIndex: matchedToken.index)
         } else {
-            // Fallback if no match found
+            // Fallback if no match found - validate before using
+            guard range.location >= 0,
+                  range.location + range.length <= utterance.speechString.count else {
+                return
+            }
             currentWordRange = range
             let nsText = utterance.speechString as NSString
             currentWordInSentence = nsText.substring(with: range)
@@ -831,6 +901,19 @@ extension TTSPlayer {
     }
     
     private func playCurrentSentence(resumeAt: Int) {
+        // Set flag to prevent nested calls during voice switching
+        guard !isStartingPlayback else {
+            Logger.log("ℹ️ Skipping playCurrentSentence - already starting playback")
+            return
+        }
+        
+        isStartingPlayback = true
+        defer { isStartingPlayback = false }
+        
+        // Detect and switch voice BEFORE speaking/generating audio
+        // This ensures voice is set correctly before utterance is created
+        detectAndSwitchVoiceForSentence(at: currentIndex)
+        
         switch appVoice {
         case .system:
             speakCurrentSentence_Apple()
@@ -954,7 +1037,8 @@ extension TTSPlayer {
             // Update time to complete after seeking
             updateTimeToComplete()
             state = .playing
-            speakCurrentSentence_Apple()
+            // Use playCurrentSentence to ensure detection happens before speaking
+            playCurrentSentence(resumeAt: currentIndex)
             startProgressTimer()
         }
     }
@@ -1137,6 +1221,277 @@ extension TTSPlayer {
         let t = title ?? ""
         let key = "\(t)\n\(u)\n\(text)"
         return String(key.hashValue)
+    }
+    
+    /// Automatically detects language from text and switches to a matching voice if enabled
+    /// This is called once when a file is prepared, for initial voice selection
+    /// - Parameter text: The text content to analyze
+    private func autoDetectLanguageAndSwitchVoice(for text: String) {
+        // Check if auto-detection is enabled (default to true)
+        let isEnabled = UserDefaults.standard.object(forKey: KeyString.autoDetectLanguage) as? Bool ?? true
+        guard isEnabled else {
+            Logger.log("ℹ️ Auto language detection is disabled")
+            return
+        }
+        
+        // Detect language from text (initial detection for first sentence)
+        guard let detectedLanguageCode = LanguageDetection.detectLanguage(from: text) else {
+            Logger.log("ℹ️ Language detection failed or confidence too low, keeping current voice")
+            return
+        }
+        
+        let isEnglish = (detectedLanguageCode.lowercased() == "en") || detectedLanguageCode.lowercased().hasPrefix("en-") || detectedLanguageCode.lowercased().hasPrefix("en_")
+        if !isEnglish {
+            disableHighlighting = true
+        } else {
+            disableHighlighting = false
+        }
+        
+        // Get current voice to check if it already matches
+        let voiceCatalog = VoiceCatalog.shared
+        let currentVoice = voiceCatalog.voices.first { $0.voiceSampleId == selectedVoiceSampleId }
+        
+        // Check if current voice already matches the detected language
+        if let current = currentVoice {
+            guard let detectedLanguageName = LanguageDetection.mapLanguageCodeToName(detectedLanguageCode) else {
+                Logger.log("ℹ️ Could not map detected language code '\(detectedLanguageCode)' to name, skipping voice check")
+                return
+            }
+            
+            // Extract base language names for flexible comparison
+            // Handles cases like "Arabic (world)" vs "Arabic (Saudi Arabia)" -> both match
+            let baseDetectedName = LanguageDetection.extractBaseLanguageName(detectedLanguageName)
+            let baseCurrentName = LanguageDetection.extractBaseLanguageName(current.language)
+            
+            // Check exact match or base name match
+            if current.language == detectedLanguageName || 
+               baseCurrentName.localizedCaseInsensitiveCompare(baseDetectedName) == .orderedSame {
+                Logger.log("ℹ️ Current voice '\(current.name)' already matches detected language '\(detectedLanguageName)' (current: \(current.language)), no switch needed")
+                return
+            }
+        }
+        
+        // Find a matching voice for the detected language
+        guard let matchingVoice = voiceCatalog.findVoiceForLanguage(detectedLanguageCode, preferSystem: true) else {
+            Logger.log("⚠️ No matching voice found for detected language '\(detectedLanguageCode)', keeping current voice")
+            return
+        }
+        
+        // Switch to the matching voice
+        Logger.log("🔄 Auto-switching voice from '\(currentVoice?.name ?? "unknown")' to '\(matchingVoice.name)' for language '\(detectedLanguageCode)'")
+        
+        // Determine target voice mode
+        let targetMode: AppVoiceMode = (matchingVoice.type == VoiceType.Free.rawValue) ? .system : .backend
+        
+        // Update voice mode if needed
+        if appVoice != targetMode {
+            updateVoiceMode(targetMode)
+        }
+        
+        // Update voice selection
+        selectedVoiceName = matchingVoice.name
+        updateSelectedVoiceSampleId(matchingVoice.voiceSampleId)
+    }
+    
+    /// Detects language for a specific sentence and switches voice if needed
+    /// Prefers keeping current voice if it matches the detected language
+    /// - Parameter sentenceIndex: The index of the sentence to detect language for
+    /// - Returns: The detected language code, or nil if detection failed
+    private func detectAndSwitchVoiceForSentence(at sentenceIndex: Int) -> String? {
+        // Check if auto-detection is enabled
+        let isEnabled = UserDefaults.standard.object(forKey: KeyString.autoDetectLanguage) as? Bool ?? true
+        guard isEnabled else {
+            return nil
+        }
+        
+        // Validate sentence index
+        guard sentenceIndex >= 0 && sentenceIndex < sentences.count else {
+            return nil
+        }
+        
+        let sentence = sentences[sentenceIndex].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !sentence.isEmpty else {
+            return nil
+        }
+        
+        // Check cache first
+        if let cachedLanguage = detectedLanguagesCache[sentenceIndex] {
+            // Use cached language, but still check if voice needs switching
+            switchVoiceIfNeeded(for: cachedLanguage)
+            return cachedLanguage
+        }
+        
+        // Detect language from sentence
+        guard let detectedLanguageCode = LanguageDetection.detectLanguage(from: sentence) else {
+            Logger.log("ℹ️ Language detection failed for sentence \(sentenceIndex + 1), keeping current voice")
+            return nil
+        }
+        
+        let lc = detectedLanguageCode.lowercased()
+        if !(lc == "en" || lc.hasPrefix("en-") || lc.hasPrefix("en_")) {
+            disableHighlighting = true
+        }
+        
+        // Cache the detected language
+        detectedLanguagesCache[sentenceIndex] = detectedLanguageCode
+        
+        // Switch voice if needed (prefers keeping current voice if same language)
+        switchVoiceIfNeeded(for: detectedLanguageCode)
+        
+        return detectedLanguageCode
+    }
+    
+    /// Groups words within a sentence by language for more granular detection
+    /// Accumulates words until enough text (≥10 chars) for reliable detection
+    /// - Parameters:
+    ///   - sentence: The sentence text
+    ///   - tokens: Array of word tokens for the sentence
+    /// - Returns: Array of tuples with text segments and their detected languages
+    private func groupWordsByLanguage(_ sentence: String, tokens: [WordToken]) -> [(text: String, language: String?)] {
+        guard !tokens.isEmpty else {
+            // Fallback: detect at sentence level
+            if let languageCode = LanguageDetection.detectLanguage(from: sentence) {
+                return [(sentence, languageCode)]
+            }
+            return [(sentence, nil)]
+        }
+        
+        var segments: [(text: String, language: String?)] = []
+        var currentSegment: [WordToken] = []
+        var currentSegmentText = ""
+        
+        for token in tokens {
+            // Add word to current segment
+            currentSegment.append(token)
+            if !currentSegmentText.isEmpty {
+                currentSegmentText += " "
+            }
+            currentSegmentText += token.text
+            
+            // Check if we have enough text for reliable detection (≥10 chars)
+            if currentSegmentText.count >= LanguageDetection.minimumTextLength {
+                // Detect language for this segment
+                let detectedLanguage = LanguageDetection.detectLanguage(from: currentSegmentText)
+                
+                // If we have previous segments, check if language changed
+                if let lastSegment = segments.last,
+                   let lastLanguage = lastSegment.language,
+                   let currentLanguage = detectedLanguage {
+                    // If language changed, finalize previous segment and start new one
+                    if lastLanguage != currentLanguage {
+                        // Add current segment as new segment with different language
+                        segments.append((currentSegmentText, currentLanguage))
+                        currentSegment = []
+                        currentSegmentText = ""
+                        continue
+                    } else {
+                        // Same language, merge with last segment
+                        let mergedText = lastSegment.text + " " + currentSegmentText
+                        segments[segments.count - 1] = (mergedText, currentLanguage)
+                        currentSegment = []
+                        currentSegmentText = ""
+                        continue
+                    }
+                }
+                
+                // Add segment with detected language (first segment or no previous segment)
+                segments.append((currentSegmentText, detectedLanguage))
+                currentSegment = []
+                currentSegmentText = ""
+            }
+        }
+        
+        // Handle remaining words that didn't reach minimum length
+        if !currentSegment.isEmpty {
+            // Try to detect language anyway, or merge with last segment
+            let detectedLanguage = LanguageDetection.detectLanguage(from: currentSegmentText)
+            if let lastSegment = segments.last,
+               let lastLanguage = lastSegment.language,
+               let currentLanguage = detectedLanguage,
+               lastLanguage == currentLanguage {
+                // Merge with last segment
+                let mergedText = lastSegment.text + " " + currentSegmentText
+                segments[segments.count - 1] = (mergedText, currentLanguage)
+            } else {
+                // Add as new segment or fallback to sentence-level detection
+                if detectedLanguage != nil {
+                    segments.append((currentSegmentText, detectedLanguage))
+                } else if segments.isEmpty {
+                    // No segments yet, fallback to sentence-level
+                    if let sentenceLanguage = LanguageDetection.detectLanguage(from: sentence) {
+                        segments.append((sentence, sentenceLanguage))
+                    } else {
+                        segments.append((sentence, nil))
+                    }
+                }
+            }
+        }
+        
+        // Fallback: if no segments created, use sentence-level detection
+        if segments.isEmpty {
+            if let languageCode = LanguageDetection.detectLanguage(from: sentence) {
+                segments.append((sentence, languageCode))
+            } else {
+                segments.append((sentence, nil))
+            }
+        }
+        
+        return segments
+    }
+    
+    /// Checks if voice needs switching and switches if the detected language differs from current voice
+    /// Prefers keeping current voice if it matches the detected language
+    /// Only switches at sentence boundaries, not mid-sentence
+    /// - Parameter detectedLanguageCode: The detected language code (e.g., "en", "es")
+    private func switchVoiceIfNeeded(for detectedLanguageCode: String) {
+        // Only allow voice switching when starting a new sentence (idle/paused) or when already starting playback
+        // Never interrupt mid-sentence playback to switch voice
+        guard state == .idle || state == .paused || isStartingPlayback else {
+            Logger.log("ℹ️ Skipping voice switch - currently playing sentence")
+            return
+        }
+        
+        let voiceCatalog = VoiceCatalog.shared
+        let currentVoice = voiceCatalog.voices.first { $0.voiceSampleId == selectedVoiceSampleId }
+        
+        // Check if current voice already matches the detected language
+        if let current = currentVoice {
+            guard let detectedLanguageName = LanguageDetection.mapLanguageCodeToName(detectedLanguageCode) else {
+                return
+            }
+            
+            // Extract base language names for flexible comparison
+            let baseDetectedName = LanguageDetection.extractBaseLanguageName(detectedLanguageName)
+            let baseCurrentName = LanguageDetection.extractBaseLanguageName(current.language)
+            
+            // Check exact match or base name match - if matches, keep current voice
+            if current.language == detectedLanguageName || 
+               baseCurrentName.localizedCaseInsensitiveCompare(baseDetectedName) == .orderedSame {
+                // Current voice matches detected language, keep it
+                return
+            }
+        }
+        
+        // Current voice doesn't match, find and switch to matching voice
+        guard let matchingVoice = voiceCatalog.findVoiceForLanguage(detectedLanguageCode, preferSystem: true) else {
+            Logger.log("⚠️ No matching voice found for detected language '\(detectedLanguageCode)', keeping current voice")
+            return
+        }
+        
+        // Switch to the matching voice
+        Logger.log("🔄 Auto-switching voice from '\(currentVoice?.name ?? "unknown")' to '\(matchingVoice.name)' for language '\(detectedLanguageCode)'")
+        
+        // Determine target voice mode
+        let targetMode: AppVoiceMode = (matchingVoice.type == VoiceType.Free.rawValue) ? .system : .backend
+        
+        // Update voice mode if needed
+        if appVoice != targetMode {
+            updateVoiceMode(targetMode)
+        }
+        
+        // Update voice selection (this will be handled by isStartingPlayback guard)
+        selectedVoiceName = matchingVoice.name
+        updateSelectedVoiceSampleId(matchingVoice.voiceSampleId)
     }
 }
 

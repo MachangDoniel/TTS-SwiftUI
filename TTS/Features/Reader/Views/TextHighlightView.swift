@@ -25,7 +25,9 @@ struct ReadOnlyAccurateHighlight: View {
     private func makeHighlightedAttributedString() -> AttributedString {
         var attr = AttributedString(fullText)
         
-        guard tts.isSpeaking,
+        // Only highlight when actively playing, not when paused or idle
+        guard !tts.disableHighlighting,
+              tts.state == .playing,
               tts.currentIndex < tts.sentences.count,
               tts.currentIndex < tts.wordTokens.count else {
             return attr
@@ -48,10 +50,26 @@ struct ReadOnlyAccurateHighlight: View {
             attr[sentenceCharRange].backgroundColor = Color.myPrimaryColor.opacity(0.15)
         }
         
-        // Highlight current word with prominent style
+        // Highlight current word with prominent style - only if we have valid word info
         if let wordIndex = tts.currentWordIndexInSentence,
-           wordIndex < sentenceTokens.count {
-            let wordToken: WordToken = tts.currentWordToken ?? sentenceTokens[wordIndex]
+           wordIndex >= 0,
+           wordIndex < sentenceTokens.count,
+           !tts.currentWordInSentence.isEmpty {
+            
+            // Use the token from currentWordToken if available, otherwise from array
+            let wordToken: WordToken
+            if let currentToken = tts.currentWordToken,
+               currentToken.index == wordIndex {
+                wordToken = currentToken
+            } else {
+                wordToken = sentenceTokens[wordIndex]
+            }
+            
+            // Validate word token range is within sentence
+            guard wordToken.range.location >= 0,
+                  wordToken.range.location + wordToken.range.length <= currentSentence.count else {
+                return attr
+            }
             
             // Calculate absolute word range in full text
             let absoluteWordLocation = sentenceRange.location + wordToken.range.location
@@ -60,7 +78,7 @@ struct ReadOnlyAccurateHighlight: View {
                 length: wordToken.range.length
             )
             
-            // Ensure range is within bounds
+            // Ensure range is within bounds of full text
             guard absoluteWordLocation >= 0,
                   absoluteWordLocation + wordToken.range.length <= (fullText as NSString).length,
                   let wordCharRange = nsRangeToAttributedStringRange(absoluteWordRange, in: attr) else {
@@ -194,7 +212,8 @@ struct EditableSentenceHighlight: View {
     }
     
     private func calculateSentenceFrame(in size: CGSize) -> CGRect? {
-        guard tts.isSpeaking,
+        // Only highlight when actively playing, not when paused or idle
+        guard tts.state == .playing,
               !fullText.isEmpty,
               tts.currentIndex < tts.sentences.count else {
             return nil
