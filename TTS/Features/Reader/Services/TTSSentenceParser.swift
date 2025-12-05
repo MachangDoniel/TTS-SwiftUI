@@ -18,8 +18,14 @@ final class TTSSentenceParser {
         let bulletPrefixes = ["- ", "• ", "* ", "– ", "— "]
         let numberedRegex = try? NSRegularExpression(pattern: "^\\s*\\d+[\\.)]\\s+", options: [])
         let headingColonSuffix: Character = ":"
+        // Sentence boundary regex that supports multiple scripts and punctuation:
+        // - Latin: . ! ?
+        // - Indic Danda: ।
+        // - Arabic question mark: ؟
+        // - CJK full stop: 。
+        // We keep an English-specific abbreviation guard only for Latin contexts.
         let sentenceRegex = try? NSRegularExpression(
-            pattern: "(?<!\\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|vs|No|Fig|e|i)\\.)(?<=[.!?])\\s+",
+            pattern: "(?:(?<!\\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|vs|No|Fig|e|i)\\.)(?<=[.!?])|(?<=[।؟。]))\\s+",
             options: [.caseInsensitive]
         )
 
@@ -98,7 +104,7 @@ final class TTSSentenceParser {
                     if !tail.isEmpty { results.append(tail) }
                 }
             } else {
-                let fallback = para.split(whereSeparator: { ".!?".contains($0) })
+                let fallback = para.split(whereSeparator: { ".!?:।؟。".contains($0) })
                 results.append(contentsOf: fallback.map(String.init))
             }
         }

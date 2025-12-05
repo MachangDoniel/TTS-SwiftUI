@@ -89,22 +89,22 @@ struct AboutView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 
                 // MARK: - Third Party Library
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Third Party Library")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.white)
-                    
-                    Text("""
-                    It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using 'Content here, content here', making it look like readable English. Many desktop publishing packages and web pages...
-                    """)
-                        .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.8))
-                        .multilineTextAlignment(.leading)
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(red: 0.13, green: 0.13, blue: 0.14))
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+//                VStack(alignment: .leading, spacing: 10) {
+//                    Text("Third Party Library")
+//                        .font(.system(size: 17, weight: .semibold))
+//                        .foregroundColor(.white)
+//                    
+//                    Text("""
+//                    It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using 'Content here, content here', making it look like readable English. Many desktop publishing packages and web pages...
+//                    """)
+//                        .font(.system(size: 14))
+//                        .foregroundColor(.white.opacity(0.8))
+//                        .multilineTextAlignment(.leading)
+//                }
+//                .padding()
+//                .frame(maxWidth: .infinity, alignment: .leading)
+//                .background(Color(red: 0.13, green: 0.13, blue: 0.14))
+//                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 
                 Spacer()
             }

@@ -19,8 +19,8 @@ struct BannerSlide: View {
             Image(imageName)
                 .resizable()
                 .scaledToFill()
-                .frame(height: 140)
-                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .frame(height: 150)
+                .clipShape(RoundedRectangle(cornerRadius: 0, style: .continuous))
                 .padding(.horizontal, 16)
                 .shadow(color: Color.black.opacity(0.15), radius: 6, x: 0, y: 3)
 

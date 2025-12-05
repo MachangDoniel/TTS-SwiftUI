@@ -20,20 +20,24 @@ struct FullPlayerView: View {
     let fileURL: URL?
     let fileType: FileType?
     
+    var onTogglePlayPause: (() -> Void)? = nil
+    
     // Support legacy initializer
-    init(tts: TTSPlayer, text: String) {
+    init(tts: TTSPlayer, text: String, onTogglePlayPause: (() -> Void)? = nil) {
         self.tts = tts
         self.text = text
         self.fileURL = nil
         self.fileType = nil
+        self.onTogglePlayPause = onTogglePlayPause
     }
     
     // Enhanced initializer with file info for download
-    init(tts: TTSPlayer, text: String, fileURL: URL?, fileType: FileType?) {
+    init(tts: TTSPlayer, text: String, fileURL: URL?, fileType: FileType?, onTogglePlayPause: (() -> Void)? = nil) {
         self.tts = tts
         self.text = text
         self.fileURL = fileURL
         self.fileType = fileType
+        self.onTogglePlayPause = onTogglePlayPause
     }
     
     var body: some View {
@@ -153,6 +157,8 @@ struct FullPlayerView: View {
                 
                 // Play / Pause
                 Button(action: {
+                    onTogglePlayPause?()
+                    
                     if tts.sentences.isEmpty {
                         tts.prepare(
                             text: text,
@@ -233,7 +239,7 @@ struct FullPlayerView: View {
                         .font(.title2)
                 }
                 .disabled(true)
-                .opacity(0.4)
+                .opacity(0)
             }
             .padding(.horizontal)
             .foregroundColor(.white)
@@ -346,9 +352,7 @@ struct MySlider: View {
 #Preview {
     FullPlayerView(
         tts: TTSPlayer(),
-        text: "Hello world. This is a test.",
-        fileURL: URL(fileURLWithPath: "/tmp/test.txt"),
-        fileType: .text
+        text: "Hello world. This is a test."
     )
     .background(Color.black)
 }
