@@ -71,23 +71,6 @@ struct PDFKitView: UIViewRepresentable {
             }
             .store(in: &context.coordinator.cancellables)
 
-        tts.$disableHighlighting
-            .receive(on: DispatchQueue.main)
-            .sink { disabled in
-                guard let doc = pdfView.document else { return }
-                if disabled {
-                    clearAnnotations(in: doc, userName: "tts_sentence")
-                    clearAnnotations(in: doc, userName: "tts_word")
-                    context.coordinator.currentSentenceHighlight = nil
-                    context.coordinator.currentWordHighlight = nil
-                    context.coordinator.currentSentenceAnnotations.removeAll()
-                } else {
-                    // Re-apply current sentence highlight when re-enabled
-                    highlightSentence(in: pdfView, index: tts.currentIndex, coordinator: context.coordinator)
-                }
-            }
-            .store(in: &context.coordinator.cancellables)
-
         // Initial highlight when view is created
         highlightSentence(in: pdfView, index: tts.currentIndex, coordinator: context.coordinator)
 
@@ -138,15 +121,6 @@ struct PDFKitView: UIViewRepresentable {
                                    index: Int,
                                    coordinator: Coordinator) {
         guard let doc = pdfView.document else { return }
-
-        if tts.disableHighlighting {
-            clearAnnotations(in: doc, userName: "tts_sentence")
-            clearAnnotations(in: doc, userName: "tts_word")
-            coordinator.currentSentenceHighlight = nil
-            coordinator.currentWordHighlight = nil
-            coordinator.currentSentenceAnnotations.removeAll()
-            return
-        }
 
         // Ensure only current sentence is highlighted: clear all previous sentence highlights
         clearAnnotations(in: doc, userName: "tts_sentence")
@@ -277,12 +251,6 @@ struct PDFKitView: UIViewRepresentable {
                                coordinator: Coordinator) {
         guard !word.isEmpty else { return }
         guard let doc = pdfView.document else { return }
-
-        if tts.disableHighlighting {
-            clearAnnotations(in: doc, userName: "tts_word")
-            coordinator.currentWordHighlight = nil
-            return
-        }
 
         let version = coordinator.highlightVersion
 
