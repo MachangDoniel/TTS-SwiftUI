@@ -13,12 +13,13 @@ struct TTSApp: App {
     @StateObject private var authVM = AuthViewModel()
     
     init() {
-            #if PRODUCTION
-            print("🔥 Running in PRODUCTION mode")
-            #else
-            print("🧪 Running in DEVELOPMENT mode")
-            #endif
-        }
+        // Debug prints for build configuration
+        #if PRODUCTION
+        print("🔥 Running in PRODUCTION mode")
+        #else
+        print("🧪 Running in DEVELOPMENT mode")
+        #endif
+    }
     
     var body: some Scene {
         WindowGroup {
