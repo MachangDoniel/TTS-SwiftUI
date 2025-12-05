@@ -73,12 +73,25 @@ struct ImageReaderView: View {
                         }
                     }
                     .padding(.horizontal)
-
-                    if isProcessing {
-                        ProgressView("Analyzing text...")
-                            .progressViewStyle(CircularProgressViewStyle(tint: .myPrimaryColor))
-                            .foregroundColor(.white)
-                            .background(Color.black.opacity(0.6))
+                    .overlay {
+                        if isProcessing {
+                            ZStack {
+                                Color.black.opacity(0.6)
+                                    .ignoresSafeArea()
+                                VStack(spacing: 12) {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .myPrimaryColor))
+                                    Text("Analyzing text...")
+                                        .foregroundColor(.white)
+                                        .font(.callout)
+                                }
+                                .padding(20)
+                                .background(Color.black.opacity(0.5))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+                            .transition(.opacity)
+                            .animation(.easeInOut(duration: 0.2), value: isProcessing)
+                        }
                     }
                 }
             } else {
