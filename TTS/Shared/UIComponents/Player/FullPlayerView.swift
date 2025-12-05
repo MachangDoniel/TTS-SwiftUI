@@ -124,7 +124,8 @@ struct FullPlayerView: View {
                 Button(action: {
                     showLanguagePicker.toggle()
                 }) {
-                    Image("default_voice_image") 
+                    
+                    Image(TTSUtility.findGender() == .male ? ImageAssets.male_voice : ImageAssets.female_voice)
                         .resizable()
                         .frame(width: 44, height: 44)
                         .clipShape(Circle())
@@ -343,3 +344,4 @@ struct MySlider: View {
     )
     .background(Color.black)
 }
+

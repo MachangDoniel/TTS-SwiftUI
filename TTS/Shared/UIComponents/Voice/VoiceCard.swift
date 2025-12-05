@@ -13,7 +13,7 @@ struct VoiceCard: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            Image("default_voice_image")
+            Image(voice.gender == .male ? ImageAssets.male_voice : ImageAssets.female_voice)
                 .resizable()
                 .scaledToFill()
                 .frame(width: 50, height: 50)
