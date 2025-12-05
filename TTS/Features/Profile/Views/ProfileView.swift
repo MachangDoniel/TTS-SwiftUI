@@ -22,10 +22,13 @@ struct ProfileView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 24) {
                     // MARK: Avatar
-                    avatarSection
+//                    avatarSection
                     
                     // MARK: Info
-                    infoSection
+//                    infoSection
+                    
+                    Text("Settings")
+                        .padding(20)
                     
                     // MARK: Settings
                     settingsSection
