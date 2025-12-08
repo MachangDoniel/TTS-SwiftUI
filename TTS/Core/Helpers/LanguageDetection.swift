@@ -13,7 +13,7 @@ struct LanguageDetection {
     
     /// Minimum confidence threshold for language detection (0.0 to 1.0)
     /// Detections below this threshold will be considered unreliable
-    static let minimumConfidence: Double = 0.3
+    static let minimumConfidence: Double = 0.95
     
     /// Minimum text length to attempt language detection
     /// Very short text may not provide reliable detection
