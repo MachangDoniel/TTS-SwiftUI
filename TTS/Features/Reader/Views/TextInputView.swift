@@ -44,6 +44,7 @@ struct TextInputView: View {
 
                     Button {
                         isReadOnly = false
+                        focused = true
                     } label: {
                         Text("Edit")
                             .font(.system(size: 16, weight: .semibold))
@@ -65,7 +66,7 @@ struct TextInputView: View {
                             )
                             .shadow(color: Color.black.opacity(0.5), radius: 8, x: 0, y: 4)
                     }
-                    .padding()
+                    .padding(.horizontal)
 //                    .accessibilityLabel("Edit")
                 }
             } else {

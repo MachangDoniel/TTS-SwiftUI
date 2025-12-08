@@ -91,7 +91,7 @@ struct HomeView: View {
     private var importSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Import & listen")
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(.white)
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
@@ -100,7 +100,7 @@ struct HomeView: View {
                 // If pick file URL, call recentStore.add(fileURL: url, kind: .files)
                 InputSourceTile(icon: "Text", title: "Type", action: { onTypeText?() })
                 InputSourceTile(icon: "Camera", title: "Scan", action: { onScan?() })
-                InputSourceTile(icon: "photo.fill.on.rectangle.fill", title: "Photo", tint: .yellow, action: { onPickPhotos?() })
+                InputSourceTile(icon: "Photo", title: "Photo", tint: .yellow, action: { onPickPhotos?() })
                 InputSourceTile(icon: "File", title: "Files", action: { onPickFiles?() })
                 InputSourceTile(icon: "Link", title: "Link", action: { onPasteLink?() })
 
@@ -123,7 +123,7 @@ struct HomeView: View {
     private var recentSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Recent Activities")
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(.white)
                 .padding(.horizontal, 20)
                 .padding(.top, 20)

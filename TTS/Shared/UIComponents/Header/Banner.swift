@@ -1,14 +1,13 @@
 //
-//  BannerSlide.swift
+//  Banner.swift
 //  TTS
 //
-//  Created by Doniel Tripura on 11/29/25.
+//  Created by Doniel Tripura on 12/8/25.
 //
-
 
 import SwiftUI
 
-struct BannerSlide: View {
+struct Banner: View {
     var imageName: String
     var buttonTitle: String?
     var onTap: (() -> Void)?
@@ -33,10 +32,10 @@ struct BannerSlide: View {
                             Text(buttonTitle)
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundColor(.black)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 7)
                                 .background(Color.white.opacity(0.95))
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         }
 
                         Spacer()   // Push button to the left
@@ -57,6 +56,6 @@ struct BannerSlide: View {
 #Preview {
     ZStack {
         Color.black.ignoresSafeArea()
-        BannerSlide(imageName: "voice_banner", buttonTitle: "Try now", onTap: {})
+        Banner(imageName: "voice_banner", buttonTitle: "Try now", onTap: {})
     }
 }
