@@ -32,7 +32,7 @@ struct InputSourceTile: View {
                     }
                 }) {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 20)
+                        RoundedRectangle(cornerRadius: 16)
                             .fill(Color(red: 0.14, green: 0.14, blue: 0.15))
 
                         VStack(spacing: 6) {
@@ -40,17 +40,17 @@ struct InputSourceTile: View {
                                 Image(uiImage: uiImage)
                                     .resizable()
                                     .scaledToFit()
-                                    .frame(width: 20, height: 20)
+                                    .frame(width: 24, height: 24)
                             } else {
                                 Image(systemName: icon)
                                     .resizable()
                                     .scaledToFit()
-                                    .frame(width: 20, height: 20)
+                                    .frame(width: 24, height: 24)
                                     .foregroundColor(tint)
                             }
 
                             Text(title)
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.white)
                         }
                         .padding(10)

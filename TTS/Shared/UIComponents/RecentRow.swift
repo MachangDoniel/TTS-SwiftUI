@@ -19,17 +19,39 @@ struct RecentRow: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.title)
-                    .font(.system(size: 14, design: .default))
+                    .font(.system(size: 16, design: .default))
                     .foregroundColor(.white)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                Text(formatTimeToComplete())
+                Text(formattedTime())
                     .font(.system(size: 12, weight: .regular))
                     .foregroundColor(.white.opacity(0.6))
             }
             Spacer(minLength: 0)
         }
     }
+    
+    private func formattedTime() -> String {
+        guard let wordCount = item.wordCount, wordCount > 0 else {
+            return "00.00"
+        }
+        
+        // Calculate time: 0.4 seconds per word
+        let totalSeconds = Int(0.4 * Double(wordCount))
+        
+        let hours = totalSeconds / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let seconds = totalSeconds % 60
+        
+        if hours > 0 {
+            // Format as hh.mm.ss
+            return String(format: "%02d.%02d.%02d", hours, minutes, seconds)
+        } else {
+            // Format as mm.ss
+            return String(format: "%02d.%02d", minutes, seconds)
+        }
+    }
+
     
     private func formatTimeToComplete() -> String {
         guard let wordCount = item.wordCount, wordCount > 0 else {
