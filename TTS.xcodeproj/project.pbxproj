@@ -477,8 +477,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "TTS/TTS-Prod-Info.plist";
-				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to scan text from physical documents so we can convert it into speech. No photos or camera data are saved or shared.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to your photo library so you can select images that contain text. We use the selected images only to extract text and convert it to speech. No photos are stored or shared.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to scan text from physical documents so we can convert it into speech.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to your photo library so you can select images that contain text. We use the selected images only to extract text and convert it to speech.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -520,8 +520,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "TTS/TTS-Prod-Info.plist";
-				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to scan text from physical documents so we can convert it into speech. No photos or camera data are saved or shared.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to your photo library so you can select images that contain text. We use the selected images only to extract text and convert it to speech. No photos are stored or shared.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to scan text from physical documents so we can convert it into speech.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to your photo library so you can select images that contain text. We use the selected images only to extract text and convert it to speech.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
