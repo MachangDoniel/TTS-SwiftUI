@@ -14,6 +14,7 @@ struct FullPlayerView: View {
     @State private var showDownloadOptions = false
     @State private var isDragging = false
     @State private var dragValue: Double = 0.0
+    @State private var displayedIndex: Int = 0
     @StateObject private var downloader = UniversalAudioDownloader()
     
     let text: String
@@ -51,6 +52,16 @@ struct FullPlayerView: View {
             
             // Enhanced Timeline Slider (skinnier version)
             VStack(spacing: 2) {
+                let sliderValueBinding: Binding<Double> = (isDragging || tts.state != .playing) ? $dragValue : Binding(
+                    get: {
+                        let upper = max(1, tts.totalDuration)
+                        let current = min(max(tts.currentTime, 0), upper)
+                        return current
+                    },
+                    set: { newValue in
+                        dragValue = newValue
+                    }
+                )
                 //                Slider(
                 //                    value: isDragging ? $dragValue : .constant(tts.currentTime),
                 //                    in: 0...max(1, tts.totalDuration),
@@ -65,13 +76,7 @@ struct FullPlayerView: View {
                 //                    }
                 //                )
                 MySlider(
-                    value: isDragging ? $dragValue : Binding(
-                        get: {
-                            let upper = max(1, tts.totalDuration)
-                            return min(max(tts.currentTime, 0), upper)
-                        },
-                        set: { dragValue = $0 }
-                    ),
+                    value: sliderValueBinding,
                     range: 0...max(1, tts.totalDuration),
                     onEditingChanged: { editing in
                         if editing {
@@ -109,13 +114,19 @@ struct FullPlayerView: View {
             
             // Time display: current time (left), sentence counter (middle), total time (right)
             HStack {
-                Text(formatTime(min(max(tts.currentTime, 0), max(1, tts.totalDuration))))
+                let clampedCurrent = min(max(tts.currentTime, 0), max(1, tts.totalDuration))
+                let currentIndexSafe = min(tts.currentIndex, max(tts.sentences.count - 1, 0))
+                let totalSentencesSafe = max(tts.sentences.count, 1)
+                let displayedCurrent = (tts.state == .playing) ? clampedCurrent : min(max(dragValue, 0), max(1, tts.totalDuration))
+                let displayedIndexSafe = min(max(displayedIndex, 0), max(tts.sentences.count - 1, 0))
+                
+                Text(formatTime(displayedCurrent))
                     .font(.caption)
                     .foregroundColor(.gray)
                 
                 Spacer()
                 
-                Text("\(min(tts.currentIndex, tts.sentences.count - 1) + 1) of \(max(tts.sentences.count, 1))")
+                Text("\(displayedIndexSafe + 1) of \(totalSentencesSafe)")
                     .font(.caption)
                     .foregroundColor(.gray)
                 
@@ -169,8 +180,16 @@ struct FullPlayerView: View {
                     
                     switch tts.state {
                     case .idle, .finished:
+                        let upper = max(1, tts.totalDuration)
+                        let target = min(max(dragValue, 0), upper)
+                        tts.seek(to: target)
                         tts.playFromCurrent()
                     case .playing, .paused:
+                        if tts.state == .paused {
+                            let upper = max(1, tts.totalDuration)
+                            let target = min(max(dragValue, 0), upper)
+                            tts.seek(to: target)
+                        }
                         tts.togglePlayPause()
                     case .loading:
                         break
@@ -244,6 +263,39 @@ struct FullPlayerView: View {
             .padding(.horizontal)
             .foregroundColor(.white)
             
+        }
+        .onAppear {
+            let upper = max(1, tts.totalDuration)
+            dragValue = min(max(tts.currentTime, 0), upper)
+            displayedIndex = min(tts.currentIndex, max(tts.sentences.count - 1, 0))
+        }
+        .onChange(of: tts.state) { newState in
+            // When playback is not active, ensure UI time does not keep advancing visually
+            switch newState {
+            case .paused, .idle, .loading, .finished:
+                isDragging = false
+                let upper = max(1, tts.totalDuration)
+                let clamped = min(max(tts.currentTime, 0), upper)
+                dragValue = clamped
+                displayedIndex = min(tts.currentIndex, max(tts.sentences.count - 1, 0))
+            case .playing:
+                let upper = max(1, tts.totalDuration)
+                dragValue = min(max(tts.currentTime, 0), upper)
+                displayedIndex = min(tts.currentIndex, max(tts.sentences.count - 1, 0))
+            }
+        }
+        .onReceive(tts.$currentTime.removeDuplicates()) { time in
+            // Only reflect time changes in UI while actually playing
+            guard tts.state == .playing else { return }
+            let upper = max(1, tts.totalDuration)
+            let clamped = min(max(time, 0), upper)
+            if !isDragging { // don't fight user drag
+                dragValue = clamped
+            }
+        }
+        .onReceive(tts.$currentIndex.removeDuplicates()) { idx in
+            guard tts.state == .playing else { return }
+            displayedIndex = min(idx, max(tts.sentences.count - 1, 0))
         }
         .padding(.vertical)
         .background(Color(.systemGray6).opacity(0.15))
