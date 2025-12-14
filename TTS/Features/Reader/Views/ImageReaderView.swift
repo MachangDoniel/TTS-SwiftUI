@@ -11,6 +11,7 @@ import AVFAudio
 import UIKit
 import Mantis
 import Combine
+import AVFoundation
 
 enum ImageSourceType {
     case camera, gallery
@@ -21,7 +22,7 @@ struct ImageReaderView: View {
     @ObservedObject var tts: TTSPlayer
     var source: ImageSourceType
     var onSaved: ((URL) -> Void)? = nil
-
+    
     @State private var image: UIImage? = nil
     @State private var croppedImage: UIImage? = nil
     @State private var wordBoxes: [OCRWordBox] = []
@@ -30,7 +31,11 @@ struct ImageReaderView: View {
     @State private var didStartPicker = false
     @State private var showImagePicker = false
     @State private var showCropper = false
-
+    
+    @State private var showCameraAlert = false
+    @State private var showSettingsButton = false
+    @State private var permissionAlertMessage = ""
+    
     var body: some View {
         VStack(spacing: 0) {
             FileViewerHeader(
@@ -42,7 +47,7 @@ struct ImageReaderView: View {
                 onSave: { /* no-op */ }
             )
             .frame(height: 60)
-
+            
             // MARK: - Image + OCR Highlight
             if let img = croppedImage ?? image {
                 ZStack {
@@ -54,7 +59,7 @@ struct ImageReaderView: View {
                                 .frame(width: geo.size.width, height: geo.size.height)
                                 .clipped()
                                 .position(x: geo.size.width / 2, y: geo.size.height / 2)
-
+                            
                             ForEach(wordBoxes, id: \.id) { box in
                                 if !tts.disableHighlighting && isCurrentWord(box.text) {
                                     RoundedRectangle(cornerRadius: 4)
@@ -99,22 +104,38 @@ struct ImageReaderView: View {
                     .onAppear {
                         if !didStartPicker {
                             didStartPicker = true
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                showImagePicker = true
+                            if source == .camera {
+                                checkCameraPermission()
+                            } else {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    showImagePicker = true
+                                }
                             }
                         }
                     }
             }
-
+            
             if !recognizedText.isEmpty {
                 Divider().background(Color.white.opacity(0.2))
                 FullPlayerView(tts: tts, text: recognizedText)
                     .background(Color.black)
             }
         }
+        .alert("Camera Access Needed", isPresented: $showCameraAlert) {
+            if showSettingsButton {
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(permissionAlertMessage)
+        }
         .background(Color.black.ignoresSafeArea())
         .preferredColorScheme(.dark)
-
+        
         // MARK: - Pick Image → Crop → OCR Flow
         .sheet(isPresented: $showImagePicker, onDismiss: {
             if let img = image { showCropper = true }
@@ -134,28 +155,28 @@ struct ImageReaderView: View {
             }
         }
     }
-
+    
     // MARK: - OCR
     private func processImage(_ img: UIImage) {
         isProcessing = true
         DispatchQueue.main.async { tts.state = .loading }
         recognizedText = ""
         wordBoxes = []
-
+        
         DispatchQueue.global(qos: .userInitiated).async {
             let request = VNRecognizeTextRequest { req, err in
                 guard err == nil else { return }
                 let observations = req.results as? [VNRecognizedTextObservation] ?? []
                 var boxes: [OCRWordBox] = []
                 var words: [String] = []
-
+                
                 for obs in observations {
                     guard let top = obs.topCandidates(1).first else { continue }
                     let text = top.string
                     words.append(text)
                     boxes.append(OCRWordBox(id: UUID(), text: text, rect: obs.boundingBox))
                 }
-
+                
                 let combined = words.joined(separator: " ")
                 DispatchQueue.main.async {
                     isProcessing = false
@@ -165,23 +186,23 @@ struct ImageReaderView: View {
                     saveImageToDisk()
                 }
             }
-
+            
             request.recognitionLevel = .accurate
             request.usesLanguageCorrection = true
             request.recognitionLanguages = ["en-US", "bn-BD", "hi-IN"]
-
+            
             guard let cg = img.cgImage else { return }
             try? VNImageRequestHandler(cgImage: cg, options: [:]).perform([request])
         }
     }
-
+    
     // MARK: - Helpers
     private func isCurrentWord(_ text: String) -> Bool {
         tts.isSpeaking &&
         text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) ==
         tts.currentWordInSentence.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
     }
-
+    
     private func saveImageToDisk() {
         guard let img = croppedImage ?? image else { return }
         do {
@@ -190,7 +211,7 @@ struct ImageReaderView: View {
             if !FileManager.default.fileExists(atPath: dir.path) {
                 try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             }
-
+            
             let name = "Image-\(Int(Date().timeIntervalSince1970)).jpg"
             let fileURL = dir.appendingPathComponent(name)
             if let data = img.jpegData(compressionQuality: 0.9) {
@@ -203,6 +224,39 @@ struct ImageReaderView: View {
             }
         } catch {
             Logger.log("❌ Save failed: \(error.localizedDescription)")
+        }
+    }
+}
+    
+extension ImageReaderView {
+    
+    private func checkCameraPermission() {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        switch status {
+        case .authorized:
+            DispatchQueue.main.async {
+                self.showImagePicker = true
+            }
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    if granted {
+                        self.showImagePicker = true
+                    } else {
+                        self.permissionAlertMessage = String.cameraPermissionAlertMessage
+                        self.showSettingsButton = true
+                        self.showCameraAlert = true
+                    }
+                }
+            }
+        case .denied, .restricted:
+            DispatchQueue.main.async {
+                self.permissionAlertMessage = String.cameraPermissionAlertMessage
+                self.showSettingsButton = true
+                self.showCameraAlert = true
+            }
+        @unknown default:
+            break
         }
     }
 }
@@ -310,3 +364,4 @@ struct OCRWordBox: Identifiable, Hashable {
     let text: String
     let rect: CGRect
 }
+
