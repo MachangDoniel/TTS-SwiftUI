@@ -394,6 +394,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TTS/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "TTS Dev";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs access to your camera to take photos.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to your photo library to select images.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -435,6 +436,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TTS/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "TTS Dev";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs access to your camera to take photos.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to your photo library to select images.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -472,12 +474,12 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 100116;
+				CURRENT_PROJECT_VERSION = 100201;
 				DEVELOPMENT_TEAM = W49J7LTUV4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "TTS/TTS-Prod-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = TTS;
+				INFOPLIST_KEY_CFBundleDisplayName = "Text to Speech";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to scan text from physical documents so we can convert it into speech.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to your photo library so you can select images that contain text. We use the selected images only to extract text and convert it to speech.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -490,7 +492,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.01;
+				MARKETING_VERSION = 1.0.02;
 				"OTHER_SWIFT_FLAGS[arch=*]" = "-DPRODUCTION\n-DPRODUCTION";
 				PRODUCT_BUNDLE_IDENTIFIER = com.neuralsound.tts;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -516,12 +518,12 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 100116;
+				CURRENT_PROJECT_VERSION = 100201;
 				DEVELOPMENT_TEAM = W49J7LTUV4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "TTS/TTS-Prod-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = TTS;
+				INFOPLIST_KEY_CFBundleDisplayName = "Text to Speech";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to scan text from physical documents so we can convert it into speech.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to your photo library so you can select images that contain text. We use the selected images only to extract text and convert it to speech.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -534,7 +536,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.01;
+				MARKETING_VERSION = 1.0.02;
 				"OTHER_SWIFT_FLAGS[arch=*]" = "-DPRODUCTION";
 				PRODUCT_BUNDLE_IDENTIFIER = com.neuralsound.tts;
 				PRODUCT_NAME = "$(TARGET_NAME)";

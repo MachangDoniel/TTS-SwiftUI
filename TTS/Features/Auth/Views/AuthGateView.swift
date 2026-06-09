@@ -19,12 +19,12 @@ struct AuthGateView: View {
     }
 
     private var currentPhase: Phase {
-//#if PRODUCTION
-//        if !authVM.hasLoadedFromKeychain { return .loading }
-//        return authVM.tokenData == nil ? .unauthenticated : .authenticated
-//#else
+#if PRODUCTION
+        if !authVM.hasLoadedFromKeychain { return .loading }
+        return authVM.tokenData == nil ? .unauthenticated : .authenticated
+#else
         return .authenticated
-//#endif
+#endif
     }
 
     var body: some View {

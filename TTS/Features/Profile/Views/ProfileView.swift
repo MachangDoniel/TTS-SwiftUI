@@ -22,19 +22,19 @@ struct ProfileView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 24) {
                     // MARK: Avatar
-//                    avatarSection
+                    avatarSection
                     
                     // MARK: Info
-//                    infoSection
+                    infoSection
                     
-                    Text("Settings")
-                        .padding(20)
+//                    Text("Settings")
+//                        .padding(20)
                     
                     // MARK: Settings
                     settingsSection
                     
                     // MARK: Logout
-//                    logoutButton
+                    logoutButton
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 24)
@@ -161,8 +161,8 @@ struct ProfileView: View {
             InfoRow(label: "Name", value: safeName)
             Divider().background(Color.white.opacity(0.1))
             InfoRow(label: "Email", value: safeEmail)
-            Divider().background(Color.white.opacity(0.1))
-            InfoRow(label: "Subscription", value: "Basic plan")
+//            Divider().background(Color.white.opacity(0.1))
+//            InfoRow(label: "Subscription", value: "Basic plan")
         }
         .background(Color(red: 0.13, green: 0.13, blue: 0.14))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
