@@ -227,6 +227,20 @@ struct LanguagePickerView: View {
                     .clipShape(Capsule())
             }
 
+            Button(action: {
+                withAnimation {
+                    selectedFilter = (selectedFilter == VoiceType.Premium) ? nil : VoiceType.Premium
+                }
+            }) {
+                Text("Premium")
+                    .font(.headline)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .foregroundColor(selectedFilter == VoiceType.Premium ? Color.myPrimaryColor : Color.white)
+                    .background(selectedFilter == VoiceType.Premium ? Color.myPrimaryColor.opacity(0.2) : Color(.systemGray6))
+                    .clipShape(Capsule())
+            }
+
             Spacer()
         }
     }
@@ -262,7 +276,7 @@ struct LanguagePickerView: View {
         isLoading = true
 
         Task { @MainActor in
-            let targetMode: AppVoiceMode = (voice.type == VoiceType.Free.rawValue) ? .system : .backend
+            let targetMode: AppVoiceMode = voice.isSystemVoice ? .system : .backend
 
             if tts.appVoice != targetMode {
                 tts.updateVoiceMode(targetMode)
@@ -285,4 +299,3 @@ struct LanguagePickerView: View {
         .environmentObject(TTSPlayer())
         .environmentObject(VoiceCatalog.shared)
 }
-

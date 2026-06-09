@@ -18,82 +18,116 @@ func setGlobalAuthViewModel(_ vm: AuthViewModel) {
 
 final class APIClient {
     static let shared = APIClient()
-    
-    // The interceptor is updated when setGlobalAuthViewModel is called
+
     var interceptor: ApiInterceptor?
-    
-    private init() {}
-    
+
+    private let encoder: JSONEncoder
+    private let decoder: JSONDecoder
+
+    private init() {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+        self.encoder = encoder
+        self.decoder = decoder
+    }
+
     func request<T: Encodable, R: Decodable>(
         _ endpoint: String,
         method: HTTPMethod = .post,
         body: T,
         headers: HTTPHeaders? = nil
     ) async throws -> R {
-        
-        let url = APIEndpoints.baseURL + endpoint
-        
-        // MARK: Log Request
-        // We can log here, but the interceptor also sees the request. 
-        // However, for consistency with previous behavior, we'll log the body.
-        if let requestData = try? JSONEncoder().encode(body),
-           let jsonString = String(data: requestData, encoding: .utf8) {
-            Logger.debugPrint("➡️ REQUEST → \(method.rawValue) \(url)")
-            Logger.debugPrint("📦 Body:")
-            Logger.debugPrint(jsonString)
-        }
-        
-        // MARK: Send Request with Interceptor
-        // The interceptor handles Authorization header injection and 401 retries.
-        let afResponse = await AF.request(
-            url,
+        let descriptor: APIRequestDescriptor<R> = APIEndpoints.makeAuthRequest(
+            path: endpoint,
             method: method,
-            parameters: body,
-            encoder: JSONParameterEncoder.default,
-            headers: headers,
-            interceptor: interceptor
+            body: body,
+            headers: headers ?? [],
+            requiresAuth: true
+        )
+        return try await send(descriptor)
+    }
+
+    func send<R: Decodable>(_ descriptor: APIRequestDescriptor<R>) async throws -> R {
+        let request = try makeURLRequest(from: descriptor)
+
+        logRequest(request)
+
+        let afResponse = await AF.request(
+            request,
+            interceptor: descriptor.requiresAuth ? interceptor : nil
         )
         .serializingData()
         .response
-        
-        // MARK: Log Raw Response
+
         let statusCode = afResponse.response?.statusCode ?? -1
-        Logger.debugPrint("⬅️ RESPONSE ← \(url) [\(statusCode)]")
-        if let data = afResponse.data,
-           let str = String(data: data, encoding: .utf8) {
-            Logger.debugPrint("📨 Response Body:\n\(str)")
-        }
-        
-        // MARK: Handle Result
+        logResponse(url: request.url?.absoluteString ?? "unknown", statusCode: statusCode, data: afResponse.data)
+
         switch afResponse.result {
         case .success(let data):
-            // Validate Status Code
+            guard !data.isEmpty else { throw APIError.emptyResponse }
             guard (200...299).contains(statusCode) else {
                 if statusCode == 401 {
                     throw APIError.unauthorized
-                } else {
-                    throw APIError.server(statusCode)
                 }
+                throw APIError.server(statusCode)
             }
-            
-            // Decode JSON
+
             do {
-                let decoded = try JSONDecoder().decode(R.self, from: data)
-                return decoded
+                return try decoder.decode(R.self, from: data)
             } catch {
-                Logger.debugPrint("❌ JSON Decoding failed: \(error.localizedDescription)")
+                Logger.apiError("JSON decoding failed: \(error.localizedDescription)")
                 throw APIError.decoding(error)
             }
-            
+
         case .failure(let error):
-            // If the interceptor failed to refresh or other network error occurred
             if let responseCode = afResponse.response?.statusCode {
-                 if responseCode == 401 {
-                     throw APIError.unauthorized
-                 }
-                 throw APIError.server(responseCode)
+                if responseCode == 401 {
+                    throw APIError.unauthorized
+                }
+                throw APIError.server(responseCode)
             }
             throw APIError.network(error)
         }
+    }
+
+    private func makeURLRequest<R>(from descriptor: APIRequestDescriptor<R>) throws -> URLRequest {
+        let rawURL = descriptor.environment.baseURL + descriptor.path
+        guard var components = URLComponents(string: rawURL) else {
+            throw APIError.invalidURL(rawURL)
+        }
+
+        if !descriptor.queryItems.isEmpty {
+            components.queryItems = descriptor.queryItems
+        }
+
+        guard let url = components.url else {
+            throw APIError.invalidURL(rawURL)
+        }
+
+        var request = URLRequest(url: url, timeoutInterval: descriptor.timeout)
+        request.httpMethod = descriptor.method.rawValue
+
+        var headers = descriptor.headers
+        if descriptor.body != nil {
+            headers.add(.contentType("application/json"))
+        }
+
+        for header in headers {
+            request.setValue(header.value, forHTTPHeaderField: header.name)
+        }
+
+        if let body = descriptor.body {
+            request.httpBody = try encoder.encode(body)
+        }
+
+        return request
+    }
+
+    private func logRequest(_ request: URLRequest) {
+        Logger.apiRequest(request)
+    }
+
+    private func logResponse(url: String, statusCode: Int, data: Data?) {
+        Logger.apiResponse(url: url, statusCode: statusCode, data: data)
     }
 }

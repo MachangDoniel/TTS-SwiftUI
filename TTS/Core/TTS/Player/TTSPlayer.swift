@@ -1281,7 +1281,7 @@ extension TTSPlayer {
         Logger.log("🔄 Auto-switching voice from '\(currentVoice?.name ?? "unknown")' to '\(matchingVoice.name)' for language '\(detectedLanguageCode)'")
         
         // Determine target voice mode
-        let targetMode: AppVoiceMode = (matchingVoice.type == VoiceType.Free.rawValue) ? .system : .backend
+        let targetMode: AppVoiceMode = matchingVoice.isSystemVoice ? .system : .backend
         
         // Update voice mode if needed
         if appVoice != targetMode {
@@ -1482,7 +1482,7 @@ extension TTSPlayer {
         Logger.log("🔄 Auto-switching voice from '\(currentVoice?.name ?? "unknown")' to '\(matchingVoice.name)' for language '\(detectedLanguageCode)'")
         
         // Determine target voice mode
-        let targetMode: AppVoiceMode = (matchingVoice.type == VoiceType.Free.rawValue) ? .system : .backend
+        let targetMode: AppVoiceMode = matchingVoice.isSystemVoice ? .system : .backend
         
         // Update voice mode if needed
         if appVoice != targetMode {
@@ -1494,4 +1494,3 @@ extension TTSPlayer {
         updateSelectedVoiceSampleId(matchingVoice.voiceSampleId)
     }
 }
-

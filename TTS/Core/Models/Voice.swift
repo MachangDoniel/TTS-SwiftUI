@@ -13,18 +13,91 @@ public enum VoiceGender: String {
     case unknown
 }
 
-struct Voice: Identifiable, Codable {
-    let id = UUID()
+enum VoiceSource: String, Codable {
+    case system
+    case remote
+}
+
+struct Voice: Identifiable, Codable, Hashable {
+    var id: String { voiceSampleId }
+
     let name: String
     let language: String
     let accent: String
     let mood: String?
     let type: String
     let voiceSampleId: String
+    let source: VoiceSource
+    let languageCode: String?
+    let genderHint: String?
+    let backendVoiceID: Int?
+    let backendCategory: String?
+    let voiceDescription: String?
+    let rating: Int?
+    let useCount: Int?
+    let priority: Int?
+    let sampleInputTextURL: URL?
+    let audioPreviewURL: URL?
+    let imageURL: URL?
+
+    init(
+        name: String,
+        language: String,
+        accent: String,
+        mood: String? = nil,
+        type: String,
+        voiceSampleId: String,
+        source: VoiceSource = .system,
+        languageCode: String? = nil,
+        genderHint: String? = nil,
+        backendVoiceID: Int? = nil,
+        backendCategory: String? = nil,
+        voiceDescription: String? = nil,
+        rating: Int? = nil,
+        useCount: Int? = nil,
+        priority: Int? = nil,
+        sampleInputTextURL: URL? = nil,
+        audioPreviewURL: URL? = nil,
+        imageURL: URL? = nil
+    ) {
+        self.name = name
+        self.language = language
+        self.accent = accent
+        self.mood = mood
+        self.type = type
+        self.voiceSampleId = voiceSampleId
+        self.source = source
+        self.languageCode = languageCode
+        self.genderHint = genderHint
+        self.backendVoiceID = backendVoiceID
+        self.backendCategory = backendCategory
+        self.voiceDescription = voiceDescription
+        self.rating = rating
+        self.useCount = useCount
+        self.priority = priority
+        self.sampleInputTextURL = sampleInputTextURL
+        self.audioPreviewURL = audioPreviewURL
+        self.imageURL = imageURL
+    }
 }
 
 extension Voice {
-    var gender: VoiceGender { voiceGender[self.voiceSampleId] ?? .unknown }
+    var gender: VoiceGender {
+        if let hint = genderHint?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            switch hint {
+            case "male":
+                return .male
+            case "female":
+                return .female
+            default:
+                break
+            }
+        }
+        return voiceGender[self.voiceSampleId] ?? .unknown
+    }
+
+    var isSystemVoice: Bool { source == .system }
+    var isBackendVoice: Bool { source == .remote }
 }
 
 let voiceGender: [String: VoiceGender] = [

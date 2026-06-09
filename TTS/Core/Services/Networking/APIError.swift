@@ -8,14 +8,18 @@
 import Foundation
 
 enum APIError: Error, LocalizedError, Equatable {
+    case invalidURL(String)
     case network(Error)          // Underlying network error
     case server(Int)             // HTTP status code
     case decoding(Error)         // JSON decoding failure
     case unauthorized            // 401
+    case emptyResponse
     case unknown                 // Fallback
 
     var errorDescription: String? {
         switch self {
+        case .invalidURL(let rawURL):
+            return "Invalid URL: \(rawURL)"
         case .network(let error):
             return "Network error: \(error.localizedDescription)"
         case .server(let code):
@@ -24,6 +28,8 @@ enum APIError: Error, LocalizedError, Equatable {
             return "Failed to decode response: \(error.localizedDescription)"
         case .unauthorized:
             return "Session expired. Please log in again."
+        case .emptyResponse:
+            return "The server returned an empty response."
         case .unknown:
             return "An unknown error occurred."
         }
@@ -31,8 +37,10 @@ enum APIError: Error, LocalizedError, Equatable {
 
     static func == (lhs: APIError, rhs: APIError) -> Bool {
         switch (lhs, rhs) {
+        case (.invalidURL(let l), .invalidURL(let r)): return l == r
         case (.server(let l), .server(let r)): return l == r
         case (.unauthorized, .unauthorized): return true
+        case (.emptyResponse, .emptyResponse): return true
         case (.unknown, .unknown): return true
         case (.network, .network), (.decoding, .decoding): return false // Cannot easily compare generic Errors
         default: return false

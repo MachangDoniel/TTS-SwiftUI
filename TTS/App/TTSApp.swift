@@ -26,6 +26,9 @@ struct TTSApp: App {
             ContentView()
                 .environmentObject(authVM)
                 .environmentObject(VoiceCatalog.shared)
+                .task {
+                    setGlobalAuthViewModel(authVM)
+                }
         }
     }
 }

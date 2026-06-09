@@ -34,10 +34,11 @@ final class SpeechViewModel: ObservableObject {
         )
         
         do {
-            let response: SpeechGenerationResponse = try await APIClient.shared.request(
-                APIEndpoints.speechGeneration,
+            let request: APIRequestDescriptor<SpeechGenerationResponse> = APIEndpoints.makeTTSRequest(
+                path: APIEndpoints.speechGeneration,
                 body: body
             )
+            let response = try await APIClient.shared.send(request)
             speechData = response.data
             
             if let url = response.data?.downloadUrl {
@@ -68,10 +69,11 @@ final class SpeechViewModel: ObservableObject {
         )
         
         do {
-            let response: SpeechGenerationResponse = try await APIClient.shared.request(
-                APIEndpoints.jobStatus,
+            let request: APIRequestDescriptor<SpeechGenerationResponse> = APIEndpoints.makeTTSRequest(
+                path: APIEndpoints.jobStatus,
                 body: body
             )
+            let response = try await APIClient.shared.send(request)
             speechData = response.data
             
             // ✅ Safely unwrap optional data

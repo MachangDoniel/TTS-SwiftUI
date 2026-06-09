@@ -36,10 +36,11 @@ final class TaskViewModel: ObservableObject {
         )
         
         do {
-            let response: CreateTaskResponse = try await APIClient.shared.request(
-                APIEndpoints.createTask,
+            let request: APIRequestDescriptor<CreateTaskResponse> = APIEndpoints.makeTTSRequest(
+                path: APIEndpoints.createTask,
                 body: body
             )
+            let response = try await APIClient.shared.send(request)
             taskId = response.data.taskId
             Logger.log("✅ Task created: \(response.data.taskId)")
         } catch {

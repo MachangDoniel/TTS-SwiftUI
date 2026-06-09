@@ -247,10 +247,10 @@ extension TTSBackendService {
     }
     
     private func downloadToCache(remote: URL, order: Int) async throws -> URL {
-        try await withCheckedThrowingContinuation { cont in
+        let (data, _) = try await URLSession.shared.data(from: remote)
+        return try await withCheckedThrowingContinuation { cont in
             downloadQueue.async {
                 do {
-                    let data = try Data(contentsOf: remote)
                     let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
                     let fileURL = dir.appendingPathComponent("tts_chunk_\(order).mp3")
                     try data.write(to: fileURL, options: .atomic)
