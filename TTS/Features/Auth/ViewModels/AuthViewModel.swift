@@ -29,7 +29,8 @@ final class AuthViewModel: ObservableObject {
         do {
             let response: AuthResponse = try await APIClient.shared.request(
                 APIEndpoints.googleAuth,
-                body: body
+                body: body,
+                requiresAuth: false
             )
             tokenData = response.data
             saveTokenData()
@@ -61,7 +62,8 @@ final class AuthViewModel: ObservableObject {
             do {
                 let response: AuthResponse = try await APIClient.shared.request(
                     APIEndpoints.refresh,
-                    body: RefreshTokenRequest(refreshToken: refreshToken)
+                    body: RefreshTokenRequest(refreshToken: refreshToken),
+                    requiresAuth: false
                 )
                 tokenData = response.data
                 saveTokenData()
@@ -114,9 +116,10 @@ final class AuthViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            let _: AuthResponse = try await APIClient.shared.request(
+            let _: LogoutResponse = try await APIClient.shared.request(
                 APIEndpoints.logout,
-                body: RefreshTokenRequest(refreshToken: refreshToken)
+                body: RefreshTokenRequest(refreshToken: refreshToken),
+                requiresAuth: false
             )
             clearTokenData()
             notifyLogout(reason: .invalidRefreshToken)
@@ -254,4 +257,3 @@ extension AuthViewModel {
         self.tokenData = nil
     }
 }
-

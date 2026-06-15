@@ -70,10 +70,8 @@ enum APIEndpoints {
     static let logout = "/api/tts/public/auth/logout"
     static let refresh = "/api/tts/public/auth/refresh"
 
-    // MARK: - Task
-    static let createTask = "/api/tts/public/task/create"
-
-    // MARK: - Speech
+    // MARK: - Jobs
+    static let uploadJobURL = "/api/tts/public/jobs/upload-url"
     static let speechGeneration = "/api/tts/public/speech-generation"
 
     // MARK: - Job Status
@@ -88,7 +86,7 @@ enum APIEndpoints {
         method: HTTPMethod = .post,
         body: T,
         headers: HTTPHeaders = [],
-        requiresAuth: Bool = true
+        requiresAuth: Bool = false
     ) -> APIRequestDescriptor<R> {
         APIRequestDescriptor(
             environment: .auth,

@@ -13,6 +13,9 @@ import UIKit
 
 struct FileViewer: View {
     let fileURL: URL
+    let onlineSourceReference: URL?
+    let onlineProjectTitle: String?
+    let onlineLibraryItem: OnlineLibraryItem?
     @ObservedObject var tts: TTSPlayer
     @Environment(\.dismiss) private var dismiss
     
@@ -28,8 +31,17 @@ struct FileViewer: View {
     
     @StateObject private var highlightCoordinator = HighlightCoordinator()
 
-    init(fileURL: URL, tts: TTSPlayer) {
+    init(
+        fileURL: URL,
+        tts: TTSPlayer,
+        onlineSourceReference: URL? = nil,
+        onlineProjectTitle: String? = nil,
+        onlineLibraryItem: OnlineLibraryItem? = nil
+    ) {
         self.fileURL = fileURL
+        self.onlineSourceReference = onlineSourceReference
+        self.onlineProjectTitle = onlineProjectTitle
+        self.onlineLibraryItem = onlineLibraryItem
         self._tts = ObservedObject(initialValue: tts)
     }
 
@@ -83,6 +95,8 @@ struct FileViewer: View {
     }
     
     private func handleFileOpening() {
+        applyOnlinePlaybackContext()
+
         // Check TTS state: if stopped (idle/finished), stop it; if playing/paused, let it continue
         if tts.state == .idle || tts.state == .finished {
             // Previous TTS is stopped, so stop it to prepare for new file
@@ -106,7 +120,14 @@ struct FileViewer: View {
                 let text = extractText(from: fileURL)
                 extractedText = text
                 editedText = text
-                tts.prepareNewFileOnly(text: text, url: fileURL, title: fileURL.lastPathComponent)
+                tts.prepareNewFileOnly(
+                    text: text,
+                    url: fileURL,
+                    title: fileURL.lastPathComponent,
+                    onlineSourceReference: onlineSourceReference,
+                    onlineProjectTitle: onlineProjectTitle
+                )
+                applyOnlinePlaybackContext()
                 tts.state = .paused
             } else {
                 // Already prepared; do nothing to avoid fake loading
@@ -134,7 +155,14 @@ struct FileViewer: View {
             } else {
                 // We have text but TTS not prepared for this URL → prepare and pause
                 tts.state = .loading
-                tts.prepareNewFileOnly(text: extractedText, url: fileURL, title: fileURL.lastPathComponent)
+                tts.prepareNewFileOnly(
+                    text: extractedText,
+                    url: fileURL,
+                    title: fileURL.lastPathComponent,
+                    onlineSourceReference: onlineSourceReference,
+                    onlineProjectTitle: onlineProjectTitle
+                )
+                applyOnlinePlaybackContext()
                 tts.state = .paused
             }
         }
@@ -230,7 +258,8 @@ struct FileViewerTTSControlWrapper: View {
             tts: tts,
             text: text,
             fileURL: fileURL,
-            fileType: TTSUtility.determineFileType(from: fileURL)
+            fileType: TTSUtility.determineFileType(from: fileURL),
+            showBackendTranscript: false
         )
     }
     
@@ -300,7 +329,14 @@ extension FileViewer {
             extractedText = trimmed
             editedText = trimmed
             
-            tts.prepareNewFileOnly(text: trimmed, url: destinationURL, title: destinationURL.lastPathComponent)
+            tts.prepareNewFileOnly(
+                text: trimmed,
+                url: destinationURL,
+                title: destinationURL.lastPathComponent,
+                onlineSourceReference: onlineSourceReference,
+                onlineProjectTitle: onlineProjectTitle
+            )
+            applyOnlinePlaybackContext()
             tts.currentURL = destinationURL
             highlightCoordinator.setDocument(.plainText(text: trimmed))
             
@@ -325,7 +361,14 @@ extension FileViewer {
             extractedText = trimmed
             editedText = trimmed
             
-            tts.prepareNewFileOnly(text: trimmed, url: destinationURL, title: destinationURL.lastPathComponent)
+            tts.prepareNewFileOnly(
+                text: trimmed,
+                url: destinationURL,
+                title: destinationURL.lastPathComponent,
+                onlineSourceReference: onlineSourceReference,
+                onlineProjectTitle: onlineProjectTitle
+            )
+            applyOnlinePlaybackContext()
             tts.currentURL = destinationURL
             highlightCoordinator.setDocument(.plainText(text: trimmed))
             
@@ -364,8 +407,11 @@ extension FileViewer {
                         self.tts.prepareNewFileOnly(
                             text: content,
                             url: self.fileURL,
-                            title: self.fileURL.lastPathComponent
+                            title: self.fileURL.lastPathComponent,
+                            onlineSourceReference: self.onlineSourceReference,
+                            onlineProjectTitle: self.onlineProjectTitle
                         )
+                        self.applyOnlinePlaybackContext()
                         self.tts.currentURL = self.fileURL
                     }
                     self.tts.state = .paused  // Set ready state after content assigned
@@ -416,7 +462,14 @@ extension FileViewer {
             editedText = trimmed
 
             // Prepare TTS with the saved text
-            tts.prepareNewFileOnly(text: trimmed, url: destinationURL, title: destinationURL.lastPathComponent)
+            tts.prepareNewFileOnly(
+                text: trimmed,
+                url: destinationURL,
+                title: destinationURL.lastPathComponent,
+                onlineSourceReference: onlineSourceReference,
+                onlineProjectTitle: onlineProjectTitle
+            )
+            applyOnlinePlaybackContext()
             tts.currentURL = destinationURL
 
             // Convert to read-only mode and update highlights
@@ -474,8 +527,11 @@ extension FileViewer {
                     self.tts.prepareNewFileOnly(
                         text: text,
                         url: self.fileURL,
-                        title: self.fileURL.lastPathComponent
+                        title: self.fileURL.lastPathComponent,
+                        onlineSourceReference: self.onlineSourceReference,
+                        onlineProjectTitle: self.onlineProjectTitle
                     )
+                    self.applyOnlinePlaybackContext()
                 }
             }
         }
@@ -497,5 +553,12 @@ extension FileViewer {
             }
         }
     }
-}
 
+    private func applyOnlinePlaybackContext() {
+        guard let onlineLibraryItem else { return }
+        tts.appVoice = .backend
+        tts.selectedVoiceSampleId = onlineLibraryItem.voiceSampleId
+        tts.selectedVoiceName = onlineLibraryItem.voiceName
+        tts.backendDocumentRequestId = onlineLibraryItem.requestId
+    }
+}

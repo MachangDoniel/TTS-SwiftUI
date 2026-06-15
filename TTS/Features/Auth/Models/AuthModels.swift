@@ -29,6 +29,12 @@ struct AuthResponse: Codable {
     let data: TokenData
 }
 
+struct LogoutResponse: Codable {
+    let status: String
+    let message: String
+    let data: String
+}
+
 struct RefreshTokenRequest: Codable {
     let refreshToken: String
 }

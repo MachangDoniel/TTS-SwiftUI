@@ -77,11 +77,10 @@ final class UniversalAudioDownloader: ObservableObject {
     private var activeDownloads: [String: Task<Void, Never>] = [:]
     private let downloadDispatchQueue = DispatchQueue(label: "audio.download.queue", attributes: .concurrent)
     private let fileManager = FileManager.default
+    private let chunkStore = BackendChunkStore.shared
     
     // Dependencies
-    private let speechViewModel = SpeechViewModel()
-    private let taskViewModel = TaskViewModel()
-    private let backendService = TTSBackendService()
+    private let jobService = PublicTTSJobService()
     private let systemVoiceGenerator = SystemVoiceAudioGenerator()
     
     init() {
@@ -175,7 +174,7 @@ final class UniversalAudioDownloader: ObservableObject {
             case .system:
                 audioFile = try await downloadSystemVoiceAudio(for: content, voiceId: voiceId)
             case .backend:
-                audioFile = try await downloadWithBackend(content: content)
+                audioFile = try await downloadWithBackend(content: content, voiceId: voiceId)
             }
             
             downloadedFiles.append(audioFile)
@@ -192,79 +191,134 @@ final class UniversalAudioDownloader: ObservableObject {
         updateDownloadingState()
     }
     
-    private func downloadWithBackend(content: FileContent) async throws -> AudioFile {
-        // Create task for backend generation
-        await taskViewModel.createTask(
-            title: content.title,
-            visitorId: "iOS Visitor",
-            userId: nil,
-            voiceSampleId: "1", // Default voice for downloads
-            platform: "IOS",
-            totalChunks: 1 // Single file download
+    private func downloadWithBackend(content: FileContent, voiceId: String) async throws -> AudioFile {
+        let voice = resolveBackendVoice(for: voiceId)
+        var localChunkURLs: [URL] = []
+        let seedRequestId = UUID().uuidString
+        let initialUpload = try jobService.prepareInitialUpload(
+            originalFileURL: content.url,
+            fallbackText: content.text,
+            requestId: seedRequestId,
+            title: content.title
         )
-        
-        guard let taskId = await taskViewModel.taskId else {
-            throw DownloadError.taskCreationFailed
-        }
-        
-        // Generate speech
-        await speechViewModel.generateSpeech(
-            taskId: taskId,
-            requestId: nil,
-            inputText: content.text,
-            order: 1
-        )
-        
-        guard let requestId = await speechViewModel.speechData?.requestId else {
-            throw DownloadError.speechGenerationFailed
-        }
-        
-        // Wait for completion
-        var downloadURL: String?
-        var attempts = 0
-        let maxAttempts = 30 // 45 seconds timeout
-        
-        while downloadURL == nil && attempts < maxAttempts {
-            try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
-            
-            await speechViewModel.checkStatus(
-                taskId: taskId,
-                requestId: requestId,
-                inputText: content.text,
-                order: 1
+        let initialUploadData = try await jobService.createUploadURL(
+            UploadJobURLRequest(
+                userId: nil,
+                visitorId: "iOS Visitor",
+                characterCount: content.text.count,
+                voiceSampleId: voice.backendVoiceID ?? Int(voice.voiceSampleId) ?? 1,
+                languageCode: resolvedLanguageCode(for: content.text, voice: voice),
+                platform: "IOS",
+                scanner: true,
+                fileExtension: initialUpload.fileExtension
             )
-            
-            downloadURL = await speechViewModel.speechData?.downloadUrl
-            attempts += 1
-            
-            // Update progress
-            let progress = min(Double(attempts) / Double(maxAttempts), 0.9)
-            downloadStates[content.id] = .downloading(progress: progress)
-        }
-        
-        guard let urlString = downloadURL, let remoteURL = URL(string: urlString) else {
+        )
+        try await jobService.uploadFile(fileURL: initialUpload.fileURL, to: initialUploadData.uploadUrl)
+        _ = try await jobService.triggerSpeechGeneration(
+            requestId: initialUploadData.requestId,
+            userId: nil,
+            visitorId: "iOS Visitor"
+        )
+        chunkStore.clearDocument(documentRequestId: initialUploadData.requestId)
+
+        let initialStatus = try await jobService.waitForJobCompletion(
+            requestId: initialUploadData.requestId,
+            userId: nil,
+            visitorId: "iOS Visitor"
+        )
+
+        guard let initialDownloadURL = initialStatus.downloadUrl,
+              let firstRemoteURL = URL(string: initialDownloadURL),
+              !initialDownloadURL.isEmpty else {
             throw DownloadError.downloadURLNotFound
         }
-        
-        // Download to local file
-        let localURL = try await downloadToLocal(remote: remoteURL, for: content)
+        let firstLocalURL = try await downloadChunkToLocal(remote: firstRemoteURL, contentId: content.id, order: 1)
+        localChunkURLs.append(firstLocalURL)
+        chunkStore.saveChunk(
+            documentRequestId: initialUploadData.requestId,
+            chunkIndex: 1,
+            remoteAudioURL: initialDownloadURL,
+            localAudioPath: firstLocalURL.path
+        )
+        downloadStates[content.id] = .downloading(progress: 0.25)
+
+        let chunkTextURLs = initialStatus.chunkTextUrls ?? []
+
+        for (index, sourceURL) in chunkTextURLs.enumerated() {
+            let item = try await jobService.downloadChunkText(from: sourceURL, index: index)
+            let order = item.index + 1
+            chunkStore.saveChunk(
+                documentRequestId: initialUploadData.requestId,
+                chunkIndex: order,
+                text: item.text,
+                remoteTextURL: item.sourceURL
+            )
+            guard index > 0 else { continue }
+            let uploadFileURL = try jobService.makeUploadFile(
+                text: item.text,
+                requestId: initialUploadData.requestId,
+                chunkIndex: order,
+                fileExtension: "txt"
+            )
+            let uploadData = try await jobService.createUploadURL(
+                UploadJobURLRequest(
+                    userId: nil,
+                    visitorId: "iOS Visitor",
+                    characterCount: item.text.count,
+                    voiceSampleId: voice.backendVoiceID ?? Int(voice.voiceSampleId) ?? 1,
+                    languageCode: resolvedLanguageCode(for: item.text, voice: voice),
+                    platform: "IOS",
+                    scanner: false,
+                    fileExtension: "txt"
+                )
+            )
+            try await jobService.uploadFile(fileURL: uploadFileURL, to: uploadData.uploadUrl)
+            _ = try await jobService.triggerSpeechGeneration(
+                requestId: uploadData.requestId,
+                userId: nil,
+                visitorId: "iOS Visitor"
+            )
+            let status = try await jobService.waitForJobCompletion(
+                requestId: uploadData.requestId,
+                userId: nil,
+                visitorId: "iOS Visitor"
+            )
+            guard let remoteAudioURL = status.downloadUrl,
+                  let remoteURL = URL(string: remoteAudioURL),
+                  !remoteAudioURL.isEmpty else {
+                throw DownloadError.downloadURLNotFound
+            }
+            let localURL = try await downloadChunkToLocal(remote: remoteURL, contentId: content.id, order: order)
+            localChunkURLs.append(localURL)
+            chunkStore.saveChunk(
+                documentRequestId: initialUploadData.requestId,
+                chunkIndex: order,
+                remoteAudioURL: remoteAudioURL,
+                localAudioPath: localURL.path
+            )
+
+            let progress = 0.25 + (0.70 * Double(order - 1) / Double(max(1, chunkTextURLs.count)))
+            downloadStates[content.id] = .downloading(progress: min(progress, 0.95))
+        }
+
+        let finalAudioURL = try await mergeAudioFiles(localChunkURLs, contentId: content.id)
         
         // Get file properties
-        let attributes = try fileManager.attributesOfItem(atPath: localURL.path)
+        let attributes = try fileManager.attributesOfItem(atPath: finalAudioURL.path)
         let fileSize = attributes[FileAttributeKey.size] as? Int64 ?? 0
         
         // Get duration if possible
-        let duration = try? await getAudioDuration(url: localURL)
+        let duration = try? await getAudioDuration(url: finalAudioURL)
         
         downloadStates[content.id] = .downloading(progress: 1.0)
         
         return AudioFile(
             id: content.id,
             originalFileURL: content.url,
-            audioURL: localURL,
+            audioURL: finalAudioURL,
             fileType: content.type,
             voiceMode: .backend,
-            voiceId: "1",
+            voiceId: voiceId,
             createdAt: Date(),
             duration: duration ?? 0.0,
             fileSize: fileSize,
@@ -327,7 +381,7 @@ final class UniversalAudioDownloader: ObservableObject {
         }
     }
     
-    private func downloadToLocal(remote: URL, for content: FileContent) async throws -> URL {
+    private func downloadChunkToLocal(remote: URL, contentId: String, order: Int) async throws -> URL {
         return try await withCheckedThrowingContinuation { continuation in
             downloadDispatchQueue.async {
                 do {
@@ -341,7 +395,7 @@ final class UniversalAudioDownloader: ObservableObject {
                         try FileManager.default.createDirectory(at: audioDirectory, withIntermediateDirectories: true)
                     }
                     
-                    let filename = "\(content.id).mp3"
+                    let filename = "\(contentId)_chunk_\(order).mp3"
                     let localURL = audioDirectory.appendingPathComponent(filename)
                     
                     try data.write(to: localURL)
@@ -352,6 +406,72 @@ final class UniversalAudioDownloader: ObservableObject {
                 }
             }
         }
+    }
+
+    private func mergeAudioFiles(_ urls: [URL], contentId: String) async throws -> URL {
+        guard let first = urls.first else {
+            throw DownloadError.fileNotFound
+        }
+
+        if urls.count == 1 {
+            let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let audioDirectory = documentsURL.appendingPathComponent("DownloadedAudio", isDirectory: true)
+            if !fileManager.fileExists(atPath: audioDirectory.path) {
+                try fileManager.createDirectory(at: audioDirectory, withIntermediateDirectories: true)
+            }
+            let destinationURL = audioDirectory.appendingPathComponent("\(contentId).mp3")
+            if fileManager.fileExists(atPath: destinationURL.path) {
+                try fileManager.removeItem(at: destinationURL)
+            }
+            try fileManager.copyItem(at: first, to: destinationURL)
+            return destinationURL
+        }
+
+        let composition = AVMutableComposition()
+        guard let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+            throw DownloadError.mergeFailed
+        }
+
+        var cursor = CMTime.zero
+        for url in urls {
+            let asset = AVURLAsset(url: url)
+            let assetTracks = try await asset.loadTracks(withMediaType: .audio)
+            guard let assetTrack = assetTracks.first else { continue }
+            let duration = try await asset.load(.duration)
+            let timeRange = CMTimeRange(start: .zero, duration: duration)
+            try track.insertTimeRange(timeRange, of: assetTrack, at: cursor)
+            cursor = cursor + timeRange.duration
+        }
+
+        let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let audioDirectory = documentsURL.appendingPathComponent("DownloadedAudio", isDirectory: true)
+        if !fileManager.fileExists(atPath: audioDirectory.path) {
+            try fileManager.createDirectory(at: audioDirectory, withIntermediateDirectories: true)
+        }
+
+        let outputURL = audioDirectory.appendingPathComponent("\(contentId).m4a")
+        if fileManager.fileExists(atPath: outputURL.path) {
+            try fileManager.removeItem(at: outputURL)
+        }
+
+        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetAppleM4A) else {
+            throw DownloadError.mergeFailed
+        }
+
+        exportSession.outputURL = outputURL
+        exportSession.outputFileType = .m4a
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            exportSession.exportAsynchronously {
+                if let error = exportSession.error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: ())
+                }
+            }
+        }
+
+        return outputURL
     }
     
     private func getAudioDuration(url: URL) async throws -> TimeInterval {
@@ -417,6 +537,30 @@ final class UniversalAudioDownloader: ObservableObject {
             downloadedFiles = []
         }
     }
+
+    private func resolveBackendVoice(for voiceId: String) -> Voice {
+        if let match = VoiceCatalog.shared.voices.first(where: { $0.voiceSampleId == voiceId }) {
+            return match
+        }
+
+        return Voice(
+            name: "Backend Voice",
+            language: "English",
+            accent: "",
+            type: VoiceType.Premium.rawValue,
+            voiceSampleId: voiceId,
+            source: .remote,
+            languageCode: "en",
+            backendVoiceID: Int(voiceId)
+        )
+    }
+
+    private func resolvedLanguageCode(for text: String, voice: Voice) -> String {
+        if let languageCode = voice.languageCode, !languageCode.isEmpty {
+            return languageCode
+        }
+        return LanguageDetection.detectLanguage(from: text) ?? "en"
+    }
 }
 
 enum DownloadError: LocalizedError {
@@ -424,6 +568,7 @@ enum DownloadError: LocalizedError {
     case speechGenerationFailed
     case downloadURLNotFound
     case fileNotFound
+    case mergeFailed
     
     var errorDescription: String? {
         switch self {
@@ -435,6 +580,8 @@ enum DownloadError: LocalizedError {
             return "Download URL not found"
         case .fileNotFound:
             return "Audio file not found"
+        case .mergeFailed:
+            return "Failed to merge audio chunks"
         }
     }
 }

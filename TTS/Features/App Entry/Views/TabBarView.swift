@@ -30,6 +30,7 @@ struct TabBarView: View {
     @State private var prefilledLinkText: String? = nil
     
     @StateObject private var recentStore = RecentStore()
+    @ObservedObject private var onlineLibraryStore = OnlineLibraryStore.shared
     @EnvironmentObject var tts: TTSPlayer
     
     @State private var showBookmarkError = false
@@ -107,9 +108,7 @@ struct TabBarView: View {
             }
             .tabItem { Label("Home", systemImage: "house.fill") }
             .tag(0)
-            
-            Spacer()
-            
+
             NavigationStack {
                 LibraryView()
                     .environmentObject(recentStore)
@@ -118,13 +117,19 @@ struct TabBarView: View {
             .tabItem { Label("Library", systemImage: "tray.fill") }
             .tag(1)
 
-            Spacer()
-            
+            NavigationStack {
+                OnlineLibraryView()
+                    .environmentObject(onlineLibraryStore)
+                    .environmentObject(tts)
+            }
+            .tabItem { Label("Library Online", systemImage: "icloud.fill") }
+            .tag(2)
+
             NavigationStack {
                 ProfileView()
             }
             .tabItem { Label("Profile", systemImage: "person.crop.circle") }
-            .tag(2)
+            .tag(3)
         }
         .preferredColorScheme(.dark)
         .toolbarBackground(.automatic, for: .tabBar)
@@ -338,4 +343,3 @@ struct TabBarView: View {
 #Preview {
     TabBarView()
 }
-

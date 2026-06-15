@@ -35,14 +35,15 @@ final class APIClient {
         _ endpoint: String,
         method: HTTPMethod = .post,
         body: T,
-        headers: HTTPHeaders? = nil
+        headers: HTTPHeaders? = nil,
+        requiresAuth: Bool = false
     ) async throws -> R {
         let descriptor: APIRequestDescriptor<R> = APIEndpoints.makeAuthRequest(
             path: endpoint,
             method: method,
             body: body,
             headers: headers ?? [],
-            requiresAuth: true
+            requiresAuth: requiresAuth
         )
         return try await send(descriptor)
     }

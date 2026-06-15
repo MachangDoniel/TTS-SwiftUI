@@ -7,25 +7,52 @@
 
 import Foundation
 
-// MARK: - Request
-struct SpeechGenerationRequest: Codable {
-    let taskId: String
-    let requestId: String?
-    let inputText: String
-    let order: Int
+struct UploadJobURLRequest: Codable {
+    let userId: String?
+    let visitorId: String?
+    let characterCount: Int
+    let voiceSampleId: Int
+    let languageCode: String
+    let platform: String
+    let scanner: Bool
+    let fileExtension: String
 }
 
-// MARK: - Response
-struct SpeechGenerationData: Codable {
-    let taskId: String?
-    let requestId: String?
-    let status: String?
-    let progress: Int?
-    let downloadUrl: String?
+struct UploadJobURLData: Codable {
+    let requestId: String
+    let uploadUrl: String
 }
 
-struct SpeechGenerationResponse: Codable {
+struct UploadJobURLResponse: Codable {
     let status: String
     let message: String
-    let data: SpeechGenerationData?
+    let data: UploadJobURLData
+}
+
+struct JobStatusRequest: Codable {
+    let requestId: String
+    let userId: String?
+    let visitorId: String?
+}
+
+struct JobStatusData: Codable {
+    let requestId: String
+    let status: String
+    let progress: Int?
+    let downloadUrl: String?
+    let chunkTextUrls: [String]?
+}
+
+struct JobStatusResponse: Codable {
+    let status: String
+    let message: String
+    let data: JobStatusData
+}
+
+struct DownloadedChunkText: Identifiable, Equatable {
+    let index: Int
+    let sourceURL: String
+    let text: String
+
+    var id: Int { index }
 }

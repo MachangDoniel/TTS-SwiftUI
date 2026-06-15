@@ -20,6 +20,9 @@ struct FullPlayerView: View {
     let text: String
     let fileURL: URL?
     let fileType: FileType?
+    let showBackendTranscript: Bool
+    let showTimeline: Bool
+    let showSentenceCounter: Bool
     
     var onTogglePlayPause: (() -> Void)? = nil
     
@@ -29,15 +32,30 @@ struct FullPlayerView: View {
         self.text = text
         self.fileURL = nil
         self.fileType = nil
+        self.showBackendTranscript = true
+        self.showTimeline = true
+        self.showSentenceCounter = true
         self.onTogglePlayPause = onTogglePlayPause
     }
     
     // Enhanced initializer with file info for download
-    init(tts: TTSPlayer, text: String, fileURL: URL?, fileType: FileType?, onTogglePlayPause: (() -> Void)? = nil) {
+    init(
+        tts: TTSPlayer,
+        text: String,
+        fileURL: URL?,
+        fileType: FileType?,
+        showBackendTranscript: Bool = true,
+        showTimeline: Bool = true,
+        showSentenceCounter: Bool = true,
+        onTogglePlayPause: (() -> Void)? = nil
+    ) {
         self.tts = tts
         self.text = text
         self.fileURL = fileURL
         self.fileType = fileType
+        self.showBackendTranscript = showBackendTranscript
+        self.showTimeline = showTimeline
+        self.showSentenceCounter = showSentenceCounter
         self.onTogglePlayPause = onTogglePlayPause
     }
     
@@ -51,7 +69,8 @@ struct FullPlayerView: View {
             //                 .padding(.horizontal)
             
             // Enhanced Timeline Slider (skinnier version)
-            VStack(spacing: 2) {
+            if showTimeline {
+                VStack(spacing: 2) {
                 let sliderValueBinding: Binding<Double> = (isDragging || tts.state != .playing) ? $dragValue : Binding(
                     get: {
                         let upper = max(1, tts.totalDuration)
@@ -110,6 +129,7 @@ struct FullPlayerView: View {
                 //                    .frame(height: 1.5)
                 //                    .padding(.horizontal)
                 //                }
+                }
             }
             
             // Time display: current time (left), sentence counter (middle), total time (right)
@@ -120,23 +140,54 @@ struct FullPlayerView: View {
                 let displayedCurrent = (tts.state == .playing) ? clampedCurrent : min(max(dragValue, 0), max(1, tts.totalDuration))
                 let displayedIndexSafe = min(max(displayedIndex, 0), max(tts.sentences.count - 1, 0))
                 
-                Text(formatTime(displayedCurrent))
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                if showTimeline {
+                    Text(formatTime(displayedCurrent))
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
                 
                 Spacer()
                 
-                Text("\(displayedIndexSafe + 1) of \(totalSentencesSafe)")
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                if showSentenceCounter {
+                    Text("\(displayedIndexSafe + 1) of \(totalSentencesSafe)")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
                 
                 Spacer()
                 
-                Text(formatTime(tts.totalDuration))
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                if showTimeline {
+                    Text(formatTime(tts.totalDuration))
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
             }
             .padding(.horizontal)
+
+            if showBackendTranscript, tts.appVoice == .backend, !tts.backendTranscript.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Backend Text")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+
+                        Spacer()
+
+                        Text(tts.backendAccessTier.rawValue)
+                            .font(.caption2)
+                            .foregroundColor(.gray)
+                    }
+
+                    TextEditor(text: .constant(tts.backendTranscript))
+                        .scrollContentBackground(.hidden)
+                        .background(Color.white.opacity(0.06))
+                        .foregroundColor(.white)
+                        .frame(minHeight: 120, maxHeight: 180)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .disabled(true)
+                }
+                .padding(.horizontal)
+            }
             
             // Main controls
             HStack(spacing: 32) {
@@ -236,11 +287,30 @@ struct FullPlayerView: View {
                 Button(action: {
                     tts.skipForward(10.0)
                 }) {
-                    VStack {
-                        Image(systemName: tts.appVoice == .system ? "chevron.forward.2" : "goforward.10")
-                            .font(.title2)
-                        Text(tts.appVoice == .system ? "Next" : "10s")
-                            .font(.caption2)
+                    HStack(alignment: .center, spacing: 8) {
+                        VStack {
+                            Image(systemName: tts.appVoice == .system ? "chevron.forward.2" : "goforward.10")
+                                .font(.title2)
+                            Text(tts.appVoice == .system ? "Next" : "10s")
+                                .font(.caption2)
+                        }
+
+                        if tts.appVoice == .backend, tts.backendJobPhase != .idle {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(tts.backendJobPhase.displayName)
+                                    .font(.caption2)
+                                    .lineLimit(1)
+
+                                if let progress = tts.backendJobProgress {
+                                    Text("\(progress)%")
+                                        .font(.caption2)
+                                        .foregroundColor(.gray)
+                                } else if tts.state == .loading {
+                                    ProgressView()
+                                        .controlSize(.mini)
+                                }
+                            }
+                        }
                     }
                 }
                 .disabled(!tts.hasActiveItem || !tts.isSeekable)
@@ -408,4 +478,3 @@ struct MySlider: View {
     )
     .background(Color.black)
 }
-

@@ -40,6 +40,13 @@ final class TTSPlayer: NSObject, ObservableObject {
     @Published var selectedVoiceSampleId: String = "com.apple.voice.super-compact.en-US.Samantha"
     @Published var selectedVoiceName: String = "Samantha"
     @Published var disableHighlighting: Bool = false
+    @Published var backendJobPhase: BackendJobPhase = .idle
+    @Published var backendJobProgress: Int? = nil
+    @Published var backendTranscript: String = ""
+    @Published var backendAccessTier: BackendAccessTier = .free
+    @Published var backendDocumentRequestId: String? = nil
+    @Published var onlineProjectSourceURL: URL? = nil
+    @Published var onlineProjectTitle: String? = nil
     
     // MARK: - Timeline Properties
     @Published var currentTime: TimeInterval = 0.0
@@ -132,6 +139,10 @@ extension TTSPlayer {
         state = .idle
         preparedContentId = makeContentId(text: trimmed, url: url, title: title)
         disableHighlighting = false
+        backendJobPhase = .idle
+        backendJobProgress = nil
+        backendTranscript = ""
+        backendDocumentRequestId = nil
         
         // Auto-detect language and switch voice if enabled
         autoDetectLanguageAndSwitchVoice(for: trimmed)
@@ -139,12 +150,24 @@ extension TTSPlayer {
     
     /// Prepare a new file for playback (reset voice + highlight) but do NOT start speaking.
     /// Use this when a bottom sheet opens or when you only want to prepare the current file.
-    func prepareNewFileOnly(text: String, url: URL?, title: String?) {
+    func prepareNewFileOnly(
+        text: String,
+        url: URL?,
+        title: String?,
+        onlineSourceReference: URL? = nil,
+        onlineProjectTitle: String? = nil
+    ) {
         // Stop any ongoing playback from the previous file
         synthesizer.stopSpeaking(at: .immediate)
         audioPlayer?.stop()
         audioPlayer = nil
         backendWorker.cancel()
+        backendJobPhase = .idle
+        backendJobProgress = nil
+        backendTranscript = ""
+        backendDocumentRequestId = nil
+        self.onlineProjectSourceURL = onlineSourceReference
+        self.onlineProjectTitle = onlineProjectTitle
         
         // Prepare fresh state for the new content
         prepare(text: text, url: url, title: title)
@@ -167,12 +190,24 @@ extension TTSPlayer {
     /// Open a new file and immediately start speaking it from the beginning (voice + highlight reset).
     /// Call this directly when the user opens/navigates to a different file.
     /// Note: Unlike `prepareNewFileOnly(...)`, this method auto-starts playback.
-    func openFile(text: String, url: URL?, title: String?) {
+    func openFile(
+        text: String,
+        url: URL?,
+        title: String?,
+        onlineSourceReference: URL? = nil,
+        onlineProjectTitle: String? = nil
+    ) {
         // Forget/stop anything from the previous file
         synthesizer.stopSpeaking(at: .immediate)
         audioPlayer?.stop()
         audioPlayer = nil
         backendWorker.cancel()
+        backendJobPhase = .idle
+        backendJobProgress = nil
+        backendTranscript = ""
+        backendDocumentRequestId = nil
+        self.onlineProjectSourceURL = onlineSourceReference
+        self.onlineProjectTitle = onlineProjectTitle
         
         // Prepare and start fresh
         prepare(text: text, url: url, title: title)
@@ -397,6 +432,9 @@ extension TTSPlayer {
         state = .idle
         currentTitle = nil
         currentURL = nil
+        backendDocumentRequestId = nil
+        onlineProjectSourceURL = nil
+        onlineProjectTitle = nil
         preparedContentId = nil
         lastPlayedContentId = nil
         disableHighlighting = false
@@ -861,13 +899,24 @@ extension TTSPlayer {
     
     // MARK: - Backend Flow
     private func startBackendFlow(resumeAt: Int? = nil) {
-        backendWorker.startFlow(
-            sentences: sentences,
-            currentIndex: currentIndex,
-            selectedVoiceSampleId: selectedVoiceSampleId,
-            player: self,
-            resumeAt: resumeAt
-        )
+        let order = max(1, min((resumeAt ?? currentIndex) + 1, max(sentences.count, 1)))
+        if let backendDocumentRequestId {
+            backendWorker.restoreSavedDocument(
+                requestId: backendDocumentRequestId,
+                voiceSampleId: selectedVoiceSampleId,
+                startOrder: order,
+                sentences: sentences,
+                player: self
+            )
+        } else {
+            backendWorker.startFlow(
+                sentences: sentences,
+                currentIndex: currentIndex,
+                selectedVoiceSampleId: selectedVoiceSampleId,
+                player: self,
+                resumeAt: resumeAt
+            )
+        }
     }
     
     private func toggleBackendPlayPause() {
@@ -918,13 +967,7 @@ extension TTSPlayer {
         case .system:
             speakCurrentSentence_Apple()
         case .backend:
-            backendWorker.startFlow(
-                sentences: sentences,
-                currentIndex: currentIndex,
-                selectedVoiceSampleId: selectedVoiceSampleId,
-                player: self,
-                resumeAt: resumeAt
-            )
+            startBackendFlow(resumeAt: resumeAt)
         }
     }
 }
@@ -1227,6 +1270,11 @@ extension TTSPlayer {
     /// This is called once when a file is prepared, for initial voice selection
     /// - Parameter text: The text content to analyze
     private func autoDetectLanguageAndSwitchVoice(for text: String) {
+        if backendDocumentRequestId != nil || onlineProjectSourceURL != nil, appVoice == .backend {
+            Logger.log("ℹ️ Skipping auto language voice switching for restored backend item")
+            return
+        }
+
         // Check if auto-detection is enabled (default to true)
         let isEnabled = UserDefaults.standard.object(forKey: KeyString.autoDetectLanguage) as? Bool ?? true
         guard isEnabled else {
@@ -1298,6 +1346,10 @@ extension TTSPlayer {
     /// - Parameter sentenceIndex: The index of the sentence to detect language for
     /// - Returns: The detected language code, or nil if detection failed
     private func detectAndSwitchVoiceForSentence(at sentenceIndex: Int) -> String? {
+        if backendDocumentRequestId != nil || onlineProjectSourceURL != nil, appVoice == .backend {
+            return nil
+        }
+
         // Check if auto-detection is enabled
         let isEnabled = UserDefaults.standard.object(forKey: KeyString.autoDetectLanguage) as? Bool ?? true
         guard isEnabled else {
