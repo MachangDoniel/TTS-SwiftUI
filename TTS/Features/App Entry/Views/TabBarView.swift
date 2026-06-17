@@ -38,7 +38,7 @@ struct TabBarView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
-                HomeView(
+                HomeViewV2(
                     onPickFiles: { showDocumentPicker = true },
                     onPickGDrive: { /* TODO */ },
                     onPickPhotos: { showPhotoReader = true },
@@ -102,6 +102,8 @@ struct TabBarView: View {
                         } else {
                             // TODO: Handle text or cloud sources
                         }
+                    }, onSeeAllRecent: {
+                        selectedTab = 1
                     }
                 )
                 .environmentObject(recentStore)
@@ -110,7 +112,7 @@ struct TabBarView: View {
             .tag(0)
 
             NavigationStack {
-                LibraryView()
+                LibraryViewV2()
                     .environmentObject(recentStore)
                     .environmentObject(tts)
             }
@@ -118,7 +120,7 @@ struct TabBarView: View {
             .tag(1)
 
             NavigationStack {
-                OnlineLibraryView()
+                OnlineLibraryViewV2()
                     .environmentObject(onlineLibraryStore)
                     .environmentObject(tts)
             }
@@ -126,9 +128,11 @@ struct TabBarView: View {
             .tag(2)
 
             NavigationStack {
-                ProfileView()
+                SettingsViewV2()
+                    .environmentObject(tts)
+                    .environmentObject(VoiceCatalog.shared)
             }
-            .tabItem { Label("Profile", systemImage: "person.crop.circle") }
+            .tabItem { Label("Settings", systemImage: "gearshape.fill") }
             .tag(3)
         }
         .preferredColorScheme(.dark)
