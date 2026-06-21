@@ -757,6 +757,16 @@ extension TTSPlayer {
             }
         }
     }
+
+    func activatePlaybackAudioSession() {
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try session.setActive(true)
+        } catch {
+            Logger.log("⚠️ Failed to activate playback audio session: \(error.localizedDescription)")
+        }
+    }
 }
 
 extension TTSPlayer: AVSpeechSynthesizerDelegate {

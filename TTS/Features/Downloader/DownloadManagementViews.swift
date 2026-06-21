@@ -42,11 +42,9 @@ struct DownloadProgressSection: View {
                 Text("Downloading...")
                     .font(.headline)
                 Spacer()
-                Text("\(Int(downloader.downloadProgress * 100))%")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                ProgressView()
+                    .controlSize(.small)
             }
-            
             ProgressView(value: downloader.downloadProgress)
                 .progressViewStyle(LinearProgressViewStyle())
             

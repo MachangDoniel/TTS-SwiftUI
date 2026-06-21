@@ -7,6 +7,7 @@
 
 import SwiftUI
 import UIKit
+import AVFoundation
 
 struct SettingsViewV2: View {
     @EnvironmentObject private var authVM: AuthViewModel
@@ -59,14 +60,18 @@ struct SettingsViewV2: View {
             }
         }
         .sheet(isPresented: $isShowingLanguagePicker) {
-            LanguagePickerView()
+            VoicePreferencesViewV2()
                 .environmentObject(tts)
                 .environmentObject(voiceCatalog)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $isShowingVoicePreferences) {
             VoicePreferencesViewV2()
                 .environmentObject(tts)
                 .environmentObject(voiceCatalog)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
         .loadingOverlay($authVM.isLoading)
     }
@@ -417,12 +422,27 @@ private extension View {
     }
 }
 
-private struct VoicePreferencesViewV2: View {
+struct VoicePreferencesViewV2: View {
     @EnvironmentObject private var tts: TTSPlayer
     @EnvironmentObject private var voiceCatalog: VoiceCatalog
     @Environment(\.dismiss) private var dismiss
     @State private var selectedTab: Int = 0
     @State private var searchText: String = ""
+    @State private var isSearching = false
+    @State private var selectedLanguage: String?
+    @State private var showLanguages = false
+    @State private var offlineOnly = false
+    @State private var cachedAudioVoiceIds: Set<String> = []
+    @State private var downloadingVoiceIds: Set<String> = []
+    @State private var previewPlayer: AVPlayer?
+    @State private var previewEndObserver: NSObjectProtocol?
+    @State private var previewingVoiceId: String?
+    @State private var pausedPreviewVoiceId: String?
+    @State private var isPreviewPlaying = false
+    @State private var pendingVoiceSampleId: String = ""
+    @State private var pendingVoiceName: String = ""
+    @State private var pendingVoiceMode: AppVoiceMode = .system
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -444,12 +464,24 @@ private struct VoicePreferencesViewV2: View {
                             showMoreButton
                         }
                         .padding(.horizontal, 16)
-                        .padding(.bottom, 24)
+                        .padding(.bottom, 108)
                     }
+
+                    saveVoiceButton
                 }
                 .padding(.top, 10)
             }
             .navigationBarHidden(true)
+            .onAppear {
+                loadPendingVoiceFromCurrentSelection()
+                refreshCachedAudioState()
+            }
+            .onChange(of: voiceCatalog.voices) { _ in
+                refreshCachedAudioState()
+            }
+            .onDisappear {
+                stopPreview()
+            }
         }
     }
 }
@@ -486,16 +518,98 @@ private extension VoicePreferencesViewV2 {
     }
 
     var filtersRow: some View {
-        HStack(spacing: 12) {
-            filterChip(systemName: "magnifyingglass", title: nil) { }
-            filterChip(systemName: nil, title: "Languages") { }
-            filterChip(systemName: nil, title: "Offline") { }
-            Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                if isSearching {
+                    searchField
+                } else {
+                    filterChip(systemName: "magnifyingglass", title: nil, isActive: false) {
+                        withAnimation {
+                            isSearching = true
+                            searchFocused = true
+                        }
+                    }
+                    filterChip(systemName: nil, title: selectedLanguage ?? "Languages", isActive: selectedLanguage != nil || showLanguages) {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                            showLanguages.toggle()
+                        }
+                    }
+                    filterChip(systemName: nil, title: "Offline", isActive: offlineOnly) {
+                        withAnimation {
+                            offlineOnly.toggle()
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+
+            if showLanguages && !isSearching {
+                languageScroller
+            }
         }
         .padding(.horizontal, 16)
     }
 
-    func filterChip(systemName: String?, title: String?, action: @escaping () -> Void) -> some View {
+    var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.white.opacity(0.62))
+            TextField("Search", text: $searchText)
+                .focused($searchFocused)
+                .foregroundStyle(.white)
+                .textInputAutocapitalization(.never)
+                .disableAutocorrection(true)
+            Button {
+                withAnimation {
+                    searchText = ""
+                    isSearching = false
+                    searchFocused = false
+                }
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.white.opacity(0.62))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Color.white.opacity(0.04))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        )
+    }
+
+    var languageScroller: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                languageChip(title: "All", isSelected: selectedLanguage == nil) {
+                    selectedLanguage = nil
+                }
+                ForEach(voiceCatalog.languages, id: \.self) { language in
+                    languageChip(title: language, isSelected: selectedLanguage == language) {
+                        selectedLanguage = language
+                    }
+                }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
+    func languageChip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .foregroundStyle(isSelected ? Color(hex: "#CDBAFF") : .white.opacity(0.76))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(isSelected ? Color.white.opacity(0.08) : Color.white.opacity(0.04))
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    func filterChip(systemName: String?, title: String?, isActive: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 8) {
                 if let systemName {
@@ -511,10 +625,10 @@ private extension VoicePreferencesViewV2 {
                         .font(.system(size: 12, weight: .bold))
                 }
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(isActive ? Color(hex: "#CDBAFF") : .white)
             .padding(.horizontal, 18)
             .padding(.vertical, 12)
-            .background(Color.white.opacity(0.04))
+            .background(isActive ? Color.white.opacity(0.08) : Color.white.opacity(0.04))
             .overlay(
                 RoundedRectangle(cornerRadius: 999, style: .continuous)
                     .stroke(Color.white.opacity(0.12), lineWidth: 1)
@@ -558,65 +672,102 @@ private extension VoicePreferencesViewV2 {
     }
 
     func voiceCard(_ voice: Voice) -> some View {
-        Button {
-            selectVoice(voice)
-        } label: {
-            HStack(spacing: 12) {
-                Circle()
-                    .fill(Color.white.opacity(0.08))
-                    .frame(width: 52, height: 52)
-                    .overlay(
-                        Image(systemName: voice.isBackendVoice ? "lock.fill" : "person.fill")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.72))
-                    )
+        HStack(spacing: 12) {
+            Button {
+                setPendingVoice(voice)
+            } label: {
+                HStack(spacing: 12) {
+                    VoiceAvatarView(voice: voice)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(voice.name)
-                        .font(.system(size: 17, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(voice.name)
+                            .font(.system(size: 17, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
 
-                    Text("\(voice.language) • \(voice.accent.isEmpty ? voice.type : voice.accent)")
-                        .font(.system(size: 13, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.62))
-                        .lineLimit(1)
+                        Text("\(voice.language) • \(voice.accent.isEmpty ? voice.type : voice.accent)")
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.62))
+                            .lineLimit(1)
+                    }
                 }
-
-                Spacer(minLength: 0)
-
-                if voice.isBackendVoice {
-                    Text("PREMIUM")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .tracking(1.2)
-                        .foregroundStyle(Color(hex: "#CDBAFF"))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(Color.white.opacity(0.05))
-                        .clipShape(Capsule())
-                }
-
-                Button {
-                    preview(voice)
-                } label: {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                        .background(Color.white.opacity(0.08))
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
+                .contentShape(Rectangle())
             }
-            .padding(14)
-            .background(Color.white.opacity(0.04))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .buttonStyle(.plain)
+
+            Spacer(minLength: 0)
+
+            if voice.isBackendVoice {
+                Text("PREMIUM")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .tracking(1.2)
+                    .foregroundStyle(Color(hex: "#CDBAFF"))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(Color.white.opacity(0.05))
+                    .clipShape(Capsule())
+            }
+
+            previewControl(for: voice)
+        }
+        .padding(14)
+        .background(pendingVoiceSampleId == voice.voiceSampleId ? Color.white.opacity(0.08) : Color.white.opacity(0.04))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(pendingVoiceSampleId == voice.voiceSampleId ? Color(hex: "#CDBAFF").opacity(0.7) : Color.white.opacity(0.10), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    var saveVoiceButton: some View {
+        Button {
+            savePendingVoice()
+        } label: {
+            Text("Save Voice")
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .foregroundStyle(.black)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
+        .disabled(pendingVoiceSampleId.isEmpty)
+        .opacity(pendingVoiceSampleId.isEmpty ? 0.45 : 1)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
+        .background(
+            LinearGradient(
+                colors: [Color(hex: "#09090B").opacity(0), Color(hex: "#09090B"), Color(hex: "#09090B")],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea(edges: .bottom)
+        )
+    }
+
+    @ViewBuilder
+    func previewControl(for voice: Voice) -> some View {
+        if voice.isBackendVoice, voice.audioPreviewURL != nil {
+            Button {
+                Task { await handlePreviewTap(for: voice) }
+            } label: {
+                ZStack {
+                    if downloadingVoiceIds.contains(voice.voiceSampleId) {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Image(systemName: previewIconName(for: voice))
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                }
+                .frame(width: 44, height: 44)
+                .background(Color.white.opacity(0.08))
+                .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     var showMoreButton: some View {
@@ -630,7 +781,10 @@ private extension VoicePreferencesViewV2 {
     var filteredVoices: [Voice] {
         let base = voiceCatalog.voices.filter { voice in
             let isPremium = voice.type == VoiceType.Premium.rawValue
-            return selectedTab == 0 ? isPremium : !isPremium
+            let matchesTab = selectedTab == 0 ? isPremium : !isPremium
+            let matchesLanguage = selectedLanguage == nil || selectedLanguage == voice.language
+            let matchesOffline = !offlineOnly || voice.isSystemVoice || cachedAudioVoiceIds.contains(voice.voiceSampleId)
+            return matchesTab && matchesLanguage && matchesOffline
         }
 
         guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return base }
@@ -644,22 +798,157 @@ private extension VoicePreferencesViewV2 {
         Dictionary(grouping: filteredVoices) { $0.language }
     }
 
-    func selectVoice(_ voice: Voice) {
-        let targetMode: AppVoiceMode = voice.isSystemVoice ? .system : .backend
-        if tts.appVoice != targetMode {
-            tts.updateVoiceMode(targetMode)
-        }
-        tts.selectedVoiceName = voice.name
-        tts.updateSelectedVoiceSampleId(voice.voiceSampleId)
+    func loadPendingVoiceFromCurrentSelection() {
+        pendingVoiceSampleId = tts.selectedVoiceSampleId
+        pendingVoiceName = tts.selectedVoiceName
+        pendingVoiceMode = tts.appVoice
     }
 
-    func preview(_ voice: Voice) {
-        let targetMode: AppVoiceMode = voice.isSystemVoice ? .system : .backend
-        if tts.appVoice != targetMode {
-            tts.updateVoiceMode(targetMode)
+    func setPendingVoice(_ voice: Voice) {
+        pendingVoiceSampleId = voice.voiceSampleId
+        pendingVoiceName = voice.name
+        pendingVoiceMode = voice.isSystemVoice ? .system : .backend
+    }
+
+    func savePendingVoice() {
+        guard !pendingVoiceSampleId.isEmpty else { return }
+        if tts.appVoice != pendingVoiceMode {
+            tts.updateVoiceMode(pendingVoiceMode)
         }
-        tts.selectedVoiceName = voice.name
-        tts.updateSelectedVoiceSampleId(voice.voiceSampleId)
+        tts.selectedVoiceName = pendingVoiceName
+        tts.updateSelectedVoiceSampleId(pendingVoiceSampleId)
+        tts.activatePlaybackAudioSession()
+        dismiss()
+    }
+
+    @MainActor
+    func handlePreviewTap(for voice: Voice) async {
+        guard voice.isBackendVoice else { return }
+
+        if previewingVoiceId == voice.voiceSampleId, isPreviewPlaying {
+            previewPlayer?.pause()
+            pausedPreviewVoiceId = voice.voiceSampleId
+            isPreviewPlaying = false
+            return
+        }
+
+        if let player = previewPlayer, pausedPreviewVoiceId == voice.voiceSampleId {
+            player.play()
+            previewingVoiceId = voice.voiceSampleId
+            pausedPreviewVoiceId = nil
+            isPreviewPlaying = true
+            return
+        }
+
+        let audioURL: URL?
+        if let cachedURL = VoiceCatalog.shared.cachedAudioPreviewURL(for: voice) {
+            audioURL = cachedURL
+        } else {
+            downloadingVoiceIds.insert(voice.voiceSampleId)
+            audioURL = await VoiceCatalog.shared.downloadAudioPreview(for: voice)
+            downloadingVoiceIds.remove(voice.voiceSampleId)
+            refreshCachedAudioState()
+        }
+
+        guard let audioURL else { return }
+        playPreview(url: audioURL, voiceId: voice.voiceSampleId)
+    }
+
+    @MainActor
+    func playPreview(url: URL, voiceId: String) {
+        tts.activatePlaybackAudioSession()
+
+        previewPlayer?.pause()
+        if let observer = previewEndObserver {
+            NotificationCenter.default.removeObserver(observer)
+            previewEndObserver = nil
+        }
+
+        let playerItem = AVPlayerItem(url: url)
+        let player = AVPlayer(playerItem: playerItem)
+        previewEndObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: playerItem,
+            queue: .main
+        ) { _ in
+            previewingVoiceId = nil
+            pausedPreviewVoiceId = nil
+            isPreviewPlaying = false
+        }
+
+        player.play()
+        previewPlayer = player
+        previewingVoiceId = voiceId
+        pausedPreviewVoiceId = nil
+        isPreviewPlaying = true
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            if previewingVoiceId == voiceId,
+               previewPlayer?.currentItem?.status == .failed {
+                let message = previewPlayer?.currentItem?.error?.localizedDescription ?? "unknown player error"
+                Logger.log("⚠️ Failed to play preview: \(message)")
+                previewingVoiceId = nil
+                pausedPreviewVoiceId = nil
+                isPreviewPlaying = false
+            }
+        }
+    }
+
+    @MainActor
+    func stopPreview() {
+        previewPlayer?.pause()
+        previewPlayer = nil
+        if let observer = previewEndObserver {
+            NotificationCenter.default.removeObserver(observer)
+            previewEndObserver = nil
+        }
+        previewingVoiceId = nil
+        pausedPreviewVoiceId = nil
+        isPreviewPlaying = false
+    }
+
+    func previewIconName(for voice: Voice) -> String {
+        if previewingVoiceId == voice.voiceSampleId, isPreviewPlaying {
+            return "pause.fill"
+        }
+        return cachedAudioVoiceIds.contains(voice.voiceSampleId) ? "play.fill" : "arrow.down"
+    }
+
+    func refreshCachedAudioState() {
+        cachedAudioVoiceIds = Set(
+            voiceCatalog.voices
+                .filter { VoiceCatalog.shared.isAudioPreviewCached(for: $0) }
+                .map(\.voiceSampleId)
+        )
+    }
+}
+
+private struct VoiceAvatarView: View {
+    let voice: Voice
+    @State private var image: UIImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Image(voice.gender == .male ? ImageAssets.male_voice : ImageAssets.female_voice)
+                    .resizable()
+                    .scaledToFill()
+            }
+        }
+        .frame(width: 52, height: 52)
+        .clipShape(Circle())
+        .task(id: "\(voice.imageURL?.absoluteString ?? "")_\(voice.updatedAt ?? "")") {
+            guard let data = await VoiceCatalog.shared.imageData(for: voice),
+                  let loadedImage = UIImage(data: data) else {
+                return
+            }
+            image = loadedImage
+        }
     }
 }
 

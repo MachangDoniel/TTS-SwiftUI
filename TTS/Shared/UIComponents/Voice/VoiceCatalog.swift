@@ -8,6 +8,7 @@
 import Foundation
 import AVFoundation
 import Combine
+import CryptoKit
 
 struct RemoteVoiceDTO: Codable {
     let id: Int
@@ -79,10 +80,27 @@ final class VoiceCatalog: ObservableObject {
     private let imageCache = NSCache<NSString, NSData>()
     private let audioCache = NSCache<NSString, NSData>()
 
-    private lazy var cacheDirectoryURL: URL = {
+    private lazy var imageCacheDirectoryURL: URL = {
         let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
-        let dir = base.appendingPathComponent("voice_assets", isDirectory: true)
+        let dir = base.appendingPathComponent("voice_images", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }()
+
+    private lazy var audioPreviewDirectoryURL: URL = {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        let dir = base.appendingPathComponent("voice_audio_previews", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            var resourceValues = URLResourceValues()
+            resourceValues.isExcludedFromBackup = true
+            var mutableDir = dir
+            try? mutableDir.setResourceValues(resourceValues)
+        } catch {
+            Logger.log("⚠️ Failed to create persistent voice audio directory: \(error.localizedDescription)")
+        }
         return dir
     }()
 
@@ -112,6 +130,7 @@ final class VoiceCatalog: ObservableObject {
         }
 
         let systemVoices = buildSystemVoices()
+        let cachedRemoteVoices = VoiceCatalogCacheStore.load()?.voices ?? []
 
         do {
             async let voicesEnvelope: APIEnvelope<[RemoteVoiceDTO]> = APIClient.shared.send(APIEndpoints.fetchPublicVoices())
@@ -121,7 +140,8 @@ final class VoiceCatalog: ObservableObject {
             let remoteLanguagesResponse = try await languagesEnvelope
 
             let remoteLanguages = remoteLanguagesResponse.data
-            let remoteVoices = mapRemoteVoices(remoteVoicesResponse.data, languages: remoteLanguages)
+            let fetchedRemoteVoices = mapRemoteVoices(remoteVoicesResponse.data, languages: remoteLanguages)
+            let remoteVoices = mergeRemoteVoices(fetchedRemoteVoices, cachedVoices: cachedRemoteVoices)
 
             VoiceCatalogCacheStore.save(
                 CachedRemoteVoiceCatalog(
@@ -135,7 +155,7 @@ final class VoiceCatalog: ObservableObject {
                 self.applyCatalog(remoteVoices: remoteVoices, remoteLanguages: remoteLanguages, systemVoices: systemVoices)
                 self.isLoading = false
             }
-            // Prefetch assets in background (images + audio previews for premium voices)
+            // Prefetch image assets only. Audio previews are downloaded on demand.
             Task.detached { [weak self] in
                 guard let self else { return }
                 await self.prefetchAssets(for: remoteVoices)
@@ -224,8 +244,23 @@ final class VoiceCatalog: ObservableObject {
                 priority: remote.priority,
                 sampleInputTextURL: URL(string: remote.sampleInputText ?? ""),
                 audioPreviewURL: URL(string: remote.audioUrl ?? ""),
-                imageURL: URL(string: remote.imageUrl ?? "")
+                imageURL: URL(string: remote.imageUrl ?? ""),
+                updatedAt: remote.updatedAt
             )
+        }
+    }
+
+    private func mergeRemoteVoices(_ fetchedVoices: [Voice], cachedVoices: [Voice]) -> [Voice] {
+        let cachedById = Dictionary(uniqueKeysWithValues: cachedVoices.map { ($0.voiceSampleId, $0) })
+
+        return fetchedVoices.map { fetched in
+            guard let cached = cachedById[fetched.voiceSampleId],
+                  let fetchedDate = parsedUpdatedAt(fetched.updatedAt),
+                  let cachedDate = parsedUpdatedAt(cached.updatedAt),
+                  cachedDate > fetchedDate else {
+                return fetched
+            }
+            return cached
         }
     }
 
@@ -237,12 +272,6 @@ final class VoiceCatalog: ObservableObject {
                 if let url = voice.imageURL {
                     group.addTask { [weak self] in
                         _ = await self?.fetchImageData(for: voice, url: url)
-                    }
-                }
-                // Prefetch audio preview for premium voices only
-                if voice.type == VoiceType.Premium.rawValue, let url = voice.audioPreviewURL {
-                    group.addTask { [weak self] in
-                        _ = await self?.fetchAudioData(for: voice, url: url)
                     }
                 }
             }
@@ -260,23 +289,46 @@ final class VoiceCatalog: ObservableObject {
     func audioPreviewURLCached(for voice: Voice) async -> URL? {
         guard voice.type == VoiceType.Premium.rawValue, let url = voice.audioPreviewURL else { return nil }
         if let data = await fetchAudioData(for: voice, url: url) {
-            return persistIfNeeded(data: data, fileName: cacheFileName(for: voice, ext: url.pathExtension))
+            return persistIfNeeded(data: data, directory: audioPreviewDirectoryURL, fileName: cacheFileName(for: voice, suffix: "audio", ext: url.pathExtension.isEmpty ? "mp3" : url.pathExtension))
         }
         return nil
     }
 
+    func isAudioPreviewCached(for voice: Voice) -> Bool {
+        guard voice.type == VoiceType.Premium.rawValue, let url = voice.audioPreviewURL else { return false }
+        let key = NSString(string: cacheKey(for: voice, suffix: "audio", url: url))
+        if audioCache.object(forKey: key) != nil { return true }
+        return diskURL(directory: audioPreviewDirectoryURL, fileName: cacheFileName(for: voice, suffix: "audio", ext: url.pathExtension.isEmpty ? "mp3" : url.pathExtension)) != nil
+    }
+
+    func cachedAudioPreviewURL(for voice: Voice) -> URL? {
+        guard voice.type == VoiceType.Premium.rawValue, let url = voice.audioPreviewURL else { return nil }
+        return diskURL(directory: audioPreviewDirectoryURL, fileName: cacheFileName(for: voice, suffix: "audio", ext: url.pathExtension.isEmpty ? "mp3" : url.pathExtension))
+    }
+
+    func downloadAudioPreview(for voice: Voice) async -> URL? {
+        guard voice.type == VoiceType.Premium.rawValue, let url = voice.audioPreviewURL else { return nil }
+        if let cached = cachedAudioPreviewURL(for: voice) { return cached }
+        guard let data = await fetchAudioData(for: voice, url: url) else { return nil }
+        return persistIfNeeded(data: data, directory: audioPreviewDirectoryURL, fileName: cacheFileName(for: voice, suffix: "audio", ext: url.pathExtension.isEmpty ? "mp3" : url.pathExtension))
+    }
+
     // MARK: - Core Fetchers
     private func fetchImageData(for voice: Voice, url: URL) async -> Data? {
-        let key = NSString(string: cacheKey(for: voice, suffix: "image"))
+        let key = NSString(string: cacheKey(for: voice, suffix: "image", url: url))
         if let cached = imageCache.object(forKey: key) { return Data(referencing: cached) }
-        if let disk = loadFromDisk(fileName: cacheFileName(for: voice, ext: url.pathExtension.isEmpty ? "img" : url.pathExtension)) {
+        if let disk = loadFromDisk(directory: imageCacheDirectoryURL, fileName: cacheFileName(for: voice, suffix: "image", ext: url.pathExtension.isEmpty ? "img" : url.pathExtension)) {
             imageCache.setObject(disk as NSData, forKey: key)
             return disk
         }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard isSuccessfulHTTPResponse(response), !data.isEmpty else {
+                Logger.log("⚠️ Image download returned invalid response for voice=\(voice.name)")
+                return nil
+            }
             imageCache.setObject(data as NSData, forKey: key)
-            _ = persistIfNeeded(data: data, fileName: cacheFileName(for: voice, ext: url.pathExtension.isEmpty ? "img" : url.pathExtension))
+            _ = persistIfNeeded(data: data, directory: imageCacheDirectoryURL, fileName: cacheFileName(for: voice, suffix: "image", ext: url.pathExtension.isEmpty ? "img" : url.pathExtension))
             return data
         } catch {
             Logger.log("⚠️ Image prefetch failed for voice=\(voice.name): \(error.localizedDescription)")
@@ -285,16 +337,20 @@ final class VoiceCatalog: ObservableObject {
     }
 
     private func fetchAudioData(for voice: Voice, url: URL) async -> Data? {
-        let key = NSString(string: cacheKey(for: voice, suffix: "audio"))
+        let key = NSString(string: cacheKey(for: voice, suffix: "audio", url: url))
         if let cached = audioCache.object(forKey: key) { return Data(referencing: cached) }
-        if let disk = loadFromDisk(fileName: cacheFileName(for: voice, ext: url.pathExtension.isEmpty ? "mp3" : url.pathExtension)) {
+        if let disk = loadFromDisk(directory: audioPreviewDirectoryURL, fileName: cacheFileName(for: voice, suffix: "audio", ext: url.pathExtension.isEmpty ? "mp3" : url.pathExtension)) {
             audioCache.setObject(disk as NSData, forKey: key)
             return disk
         }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard isSuccessfulHTTPResponse(response), !data.isEmpty else {
+                Logger.log("⚠️ Audio preview download returned invalid response for voice=\(voice.name)")
+                return nil
+            }
             audioCache.setObject(data as NSData, forKey: key)
-            _ = persistIfNeeded(data: data, fileName: cacheFileName(for: voice, ext: url.pathExtension.isEmpty ? "mp3" : url.pathExtension))
+            _ = persistIfNeeded(data: data, directory: audioPreviewDirectoryURL, fileName: cacheFileName(for: voice, suffix: "audio", ext: url.pathExtension.isEmpty ? "mp3" : url.pathExtension))
             return data
         } catch {
             Logger.log("⚠️ Audio preview prefetch failed for voice=\(voice.name): \(error.localizedDescription)")
@@ -303,22 +359,28 @@ final class VoiceCatalog: ObservableObject {
     }
 
     // MARK: - Disk Helpers
-    private func cacheKey(for voice: Voice, suffix: String) -> String {
-        return "\(voice.voiceSampleId)_\(suffix)"
+    private func cacheKey(for voice: Voice, suffix: String, url: URL) -> String {
+        return "\(voice.voiceSampleId)_\(suffix)_\(assetVersion(for: voice, url: url))"
     }
 
-    private func cacheFileName(for voice: Voice, ext: String) -> String {
+    private func cacheFileName(for voice: Voice, suffix: String, ext: String) -> String {
         let safeExt = ext.isEmpty ? "bin" : ext
-        return "\(voice.voiceSampleId).\(safeExt)"
+        let version = assetVersion(for: voice, url: suffix == "audio" ? voice.audioPreviewURL : voice.imageURL)
+        return "\(safeFileComponent(voice.voiceSampleId))_\(suffix)_\(version).\(safeFileComponent(safeExt))"
     }
 
-    private func loadFromDisk(fileName: String) -> Data? {
-        let url = cacheDirectoryURL.appendingPathComponent(fileName)
+    private func loadFromDisk(directory: URL, fileName: String) -> Data? {
+        let url = directory.appendingPathComponent(fileName)
         return try? Data(contentsOf: url)
     }
 
-    private func persistIfNeeded(data: Data, fileName: String) -> URL? {
-        let url = cacheDirectoryURL.appendingPathComponent(fileName)
+    private func diskURL(directory: URL, fileName: String) -> URL? {
+        let url = directory.appendingPathComponent(fileName)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
+    private func persistIfNeeded(data: Data, directory: URL, fileName: String) -> URL? {
+        let url = directory.appendingPathComponent(fileName)
         do {
             try data.write(to: url, options: .atomic)
             return url
@@ -326,6 +388,47 @@ final class VoiceCatalog: ObservableObject {
             Logger.log("⚠️ Failed to persist asset \(fileName): \(error.localizedDescription)")
             return nil
         }
+    }
+
+    private func assetVersion(for voice: Voice, url: URL?) -> String {
+        let raw = voice.updatedAt?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let raw, !raw.isEmpty {
+            return sha256Hex(raw)
+        }
+        return sha256Hex(url?.absoluteString ?? "current")
+    }
+
+    private func sha256Hex(_ value: String) -> String {
+        let digest = SHA256.hash(data: Data(value.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func safeFileComponent(_ value: String) -> String {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+        let scalars = value.unicodeScalars.map { allowed.contains($0) ? Character($0) : "_" }
+        return String(scalars).trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+    }
+
+    private func parsedUpdatedAt(_ value: String?) -> Date? {
+        guard let value, !value.isEmpty else { return nil }
+
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = isoFormatter.date(from: value) { return date }
+
+        isoFormatter.formatOptions = [.withInternetDateTime]
+        if let date = isoFormatter.date(from: value) { return date }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter.date(from: value)
+    }
+
+    private func isSuccessfulHTTPResponse(_ response: URLResponse) -> Bool {
+        guard let httpResponse = response as? HTTPURLResponse else { return true }
+        return (200..<300).contains(httpResponse.statusCode)
     }
 
     private func regionName(from languageCode: String) -> String {

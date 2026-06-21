@@ -39,6 +39,7 @@ struct Voice: Identifiable, Codable, Hashable {
     let sampleInputTextURL: URL?
     let audioPreviewURL: URL?
     let imageURL: URL?
+    let updatedAt: String?
 
     init(
         name: String,
@@ -58,7 +59,8 @@ struct Voice: Identifiable, Codable, Hashable {
         priority: Int? = nil,
         sampleInputTextURL: URL? = nil,
         audioPreviewURL: URL? = nil,
-        imageURL: URL? = nil
+        imageURL: URL? = nil,
+        updatedAt: String? = nil
     ) {
         self.name = name
         self.language = language
@@ -78,6 +80,7 @@ struct Voice: Identifiable, Codable, Hashable {
         self.sampleInputTextURL = sampleInputTextURL
         self.audioPreviewURL = audioPreviewURL
         self.imageURL = imageURL
+        self.updatedAt = updatedAt
     }
 }
 

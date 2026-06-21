@@ -301,10 +301,9 @@ struct FullPlayerView: View {
                                     .font(.caption2)
                                     .lineLimit(1)
 
-                                if let progress = tts.backendJobProgress {
-                                    Text("\(progress)%")
-                                        .font(.caption2)
-                                        .foregroundColor(.gray)
+                                if tts.backendJobProgress != nil {
+                                    ProgressView()
+                                        .controlSize(.mini)
                                 } else if tts.state == .loading {
                                     ProgressView()
                                         .controlSize(.mini)
@@ -374,9 +373,10 @@ struct FullPlayerView: View {
         .padding(.bottom)
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showLanguagePicker) {
-            LanguagePickerView()
+            VoicePreferencesViewV2()
                 .environmentObject(tts)
-                .presentationDetents([.medium, .large])
+                .environmentObject(VoiceCatalog.shared)
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showDownloadOptions) {

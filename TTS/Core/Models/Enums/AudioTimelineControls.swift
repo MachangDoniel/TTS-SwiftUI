@@ -155,20 +155,14 @@ struct AudioDownloadButton: View {
                 showingVoiceOptions = true
             }
         } label: {
-            HStack(spacing: 4) {
+            VStack(spacing: 2) {
                 downloadIcon
-                    .font(.caption)
-                
-                if case .downloading(let progress) = downloadState {
-                    Text("\(Int(progress * 100))%")
-                        .font(.caption2)
-                }
+                    .font(.system(size: 16, weight: .semibold))
             }
             .foregroundColor(.white)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .frame(width: 48, height: 44)
             .background(downloadBackgroundColor)
-            .cornerRadius(6)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .disabled(downloadState.isActive)
         .onReceive(downloader.$downloadStates.map { $0[content.id] ?? .notStarted }) { state in
@@ -306,4 +300,3 @@ struct VoiceDownloadOptionsView: View {
         isPresented = false
     }
 }
-
