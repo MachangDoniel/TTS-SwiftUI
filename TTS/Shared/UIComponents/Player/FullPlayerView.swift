@@ -135,10 +135,14 @@ struct FullPlayerView: View {
             // Time display: current time (left), sentence counter (middle), total time (right)
             HStack {
                 let clampedCurrent = min(max(tts.currentTime, 0), max(1, tts.totalDuration))
-                let currentIndexSafe = min(tts.currentIndex, max(tts.sentences.count - 1, 0))
                 let totalSentencesSafe = max(tts.sentences.count, 1)
                 let displayedCurrent = (tts.state == .playing) ? clampedCurrent : min(max(dragValue, 0), max(1, tts.totalDuration))
                 let displayedIndexSafe = min(max(displayedIndex, 0), max(tts.sentences.count - 1, 0))
+                let chunkCount = backendChunkCount()
+                let displayedChunkIndex = min(tts.currentIndex + 1, max(chunkCount, 1))
+                let middleCounterText = tts.appVoice == .backend
+                    ? "Chunk \(displayedChunkIndex) of \(max(chunkCount, 1))"
+                    : "\(displayedIndexSafe + 1) of \(totalSentencesSafe)"
                 
                 if showTimeline {
                     Text(formatTime(displayedCurrent))
@@ -149,7 +153,7 @@ struct FullPlayerView: View {
                 Spacer()
                 
                 if showSentenceCounter {
-                    Text("\(displayedIndexSafe + 1) of \(totalSentencesSafe)")
+                    Text(middleCounterText)
                         .font(.caption)
                         .foregroundColor(.gray)
                 }
@@ -260,19 +264,20 @@ struct FullPlayerView: View {
                                 .frame(width: 76, height: 76)
                             
                             // Foreground arc — visible and rotating only when loading
+                            let shouldShowLoadingRing = tts.state == .loading && tts.backendJobPhase != .prefetchingNextChunk
                             Circle()
                                 .trim(from: 0.0, to: 0.78)
                                 .stroke(Color.white.opacity(0.9), style: StrokeStyle(lineWidth: 3, lineCap: .round))
                                 .frame(width: 76, height: 76)
                                 .rotationEffect(.degrees(-90)) // start at top
-                                .rotationEffect(.degrees(tts.state == .loading ? 360 : 0))
+                                .rotationEffect(.degrees(shouldShowLoadingRing ? 360 : 0))
                                 .animation(
-                                    tts.state == .loading
+                                    shouldShowLoadingRing
                                     ? .linear(duration: 1.1).repeatForever(autoreverses: false)
                                     : .default,
                                     value: tts.state
                                 )
-                                .opacity(tts.state == .loading ? 1.0 : 0.0)
+                                .opacity(shouldShowLoadingRing ? 1.0 : 0.0)
                         }
                         
                         Image(systemName: tts.state == .playing ? "pause.fill" : "play.fill")
@@ -287,29 +292,11 @@ struct FullPlayerView: View {
                 Button(action: {
                     tts.skipForward(10.0)
                 }) {
-                    HStack(alignment: .center, spacing: 8) {
-                        VStack {
-                            Image(systemName: tts.appVoice == .system ? "chevron.forward.2" : "goforward.10")
-                                .font(.title2)
-                            Text(tts.appVoice == .system ? "Next" : "10s")
-                                .font(.caption2)
-                        }
-
-                        if tts.appVoice == .backend, tts.backendJobPhase != .idle {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(tts.backendJobPhase.displayName)
-                                    .font(.caption2)
-                                    .lineLimit(1)
-
-                                if tts.backendJobProgress != nil {
-                                    ProgressView()
-                                        .controlSize(.mini)
-                                } else if tts.state == .loading {
-                                    ProgressView()
-                                        .controlSize(.mini)
-                                }
-                            }
-                        }
+                    VStack {
+                        Image(systemName: tts.appVoice == .system ? "chevron.forward.2" : "goforward.10")
+                            .font(.title2)
+                        Text(tts.appVoice == .system ? "Next" : "10s")
+                            .font(.caption2)
                     }
                 }
                 .disabled(!tts.hasActiveItem || !tts.isSeekable)
@@ -413,6 +400,14 @@ extension FullPlayerView {
             rootViewController.present(activityVC, animated: true)
         }
     }
+
+    private func backendChunkCount() -> Int {
+        guard tts.appVoice == .backend,
+              let requestId = tts.backendDocumentRequestId
+        else { return tts.sentences.count }
+
+        return BackendChunkStore.shared.fetchAllChunks(documentRequestId: requestId).count
+    }
 }
 
 struct MySlider: View {
@@ -448,24 +443,27 @@ struct MySlider: View {
                     .fill(Color.myPrimaryColor)
                     .frame(width: 12, height: 12)     // 👈 Change size here
                     .offset(x: thumbX - 6)            // center alignment
-                    .gesture(
-                        DragGesture()
-                            .onChanged { gesture in
-                                let location = min(max(0, gesture.location.x), width)
-                                let percent = location / width
-                                let unclamped = range.lowerBound + Double(percent) * (range.upperBound - range.lowerBound)
-                                let newValue = min(max(unclamped, range.lowerBound), range.upperBound)
-
-                                isDragging = true
-                                onEditingChanged(true)
-                                value = newValue
-                            }
-                            .onEnded { _ in
-                                isDragging = false
-                                onEditingChanged(false)
-                            }
-                    )
             }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { gesture in
+                        let location = min(max(0, gesture.location.x), width)
+                        let percent = width > 0 ? location / width : 0
+                        let unclamped = range.lowerBound + Double(percent) * (range.upperBound - range.lowerBound)
+                        let newValue = min(max(unclamped, range.lowerBound), range.upperBound)
+
+                        if !isDragging {
+                            isDragging = true
+                            onEditingChanged(true)
+                        }
+                        value = newValue
+                    }
+                    .onEnded { _ in
+                        isDragging = false
+                        onEditingChanged(false)
+                    }
+            )
         }
         .frame(height: 24)
     }

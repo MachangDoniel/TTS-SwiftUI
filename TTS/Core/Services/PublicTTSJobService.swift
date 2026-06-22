@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Alamofire
 import UniformTypeIdentifiers
 
 struct PreparedInitialUpload {
@@ -33,31 +34,45 @@ final class PublicTTSJobService {
             throw APIError.invalidURL(uploadURL)
         }
 
+        Logger.log("⬆️ Starting upload for \(fileURL.lastPathComponent)")
         let data = try Data(contentsOf: fileURL)
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
-        request.httpBody = data
-        request.setValue(mimeType(for: fileURL), forHTTPHeaderField: "Content-Type")
-        request.setValue(String(data.count), forHTTPHeaderField: "Content-Length")
+        let headers: HTTPHeaders = [
+            HTTPHeader(name: "Content-Type", value: mimeType(for: fileURL)),
+            HTTPHeader(name: "Content-Length", value: String(data.count))
+        ]
 
-        Logger.apiRequest(request)
+        var logRequest = URLRequest(url: url)
+        logRequest.httpMethod = "PUT"
+        headers.forEach { logRequest.setValue($0.value, forHTTPHeaderField: $0.name) }
+        Logger.apiRequest(logRequest)
 
-        let (responseData, response) = try await URLSession.shared.data(for: request)
-        if let httpResponse = response as? HTTPURLResponse {
-            Logger.apiResponse(
-                url: url.absoluteString,
-                statusCode: httpResponse.statusCode,
-                data: responseData
-            )
-            if !(200...299).contains(httpResponse.statusCode) {
-                throw APIError.server(httpResponse.statusCode)
+        let response = await AF.upload(
+            fileURL,
+            to: url,
+            method: .put,
+            headers: headers
+        )
+        .serializingData()
+        .response
+
+        let statusCode = response.response?.statusCode ?? -1
+        Logger.apiResponse(
+            url: url.absoluteString,
+            statusCode: statusCode,
+            data: response.data
+        )
+
+        switch response.result {
+        case .success:
+            guard (200...299).contains(statusCode) else {
+                throw APIError.server(statusCode)
             }
-        } else {
-            Logger.apiResponse(
-                url: url.absoluteString,
-                statusCode: -1,
-                data: responseData
-            )
+            Logger.log("✅ Upload finished for \(fileURL.lastPathComponent)")
+        case .failure(let error):
+            if let responseCode = response.response?.statusCode {
+                throw APIError.server(responseCode)
+            }
+            throw APIError.network(error)
         }
     }
 

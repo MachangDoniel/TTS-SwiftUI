@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AVFoundation
 
 struct OnlineLibraryPlayerView: View {
     @ObservedObject var tts: TTSPlayer
@@ -72,7 +73,7 @@ struct OnlineLibraryPlayerView: View {
                 fileType: .text,
                 showBackendTranscript: false,
                 showTimeline: true,
-                showSentenceCounter: false
+                showSentenceCounter: true
             )
         }
         .background(Color.black.ignoresSafeArea())
@@ -87,27 +88,34 @@ struct OnlineLibraryPlayerView: View {
     @MainActor
     private func preparePlayback() async {
         let resolvedItem = await ensureTranscriptIsAvailable(for: activeItem)
-        activeItem = resolvedItem
-        seedChunkStore(using: resolvedItem)
+        let resolvedDuration = resolvedItem.totalDuration ?? computeTotalDuration(for: resolvedItem)
+        var preparedItem = resolvedItem
+        if resolvedItem.totalDuration != resolvedDuration, resolvedDuration ?? 0 > 0 {
+            preparedItem.totalDuration = resolvedDuration
+            OnlineLibraryStore.shared.save(item: preparedItem)
+        }
+        activeItem = preparedItem
+        seedChunkStore(using: preparedItem)
 
-        let content = (try? String(contentsOf: resolvedItem.generatedTextURL, encoding: .utf8)) ?? ""
+        let content = (try? String(contentsOf: preparedItem.generatedTextURL, encoding: .utf8)) ?? ""
         transcript = content
 
         tts.appVoice = .backend
-        tts.selectedVoiceSampleId = resolvedItem.voiceSampleId
-        tts.selectedVoiceName = resolvedItem.voiceName
-        tts.backendDocumentRequestId = resolvedItem.requestId
+        tts.selectedVoiceSampleId = preparedItem.voiceSampleId
+        tts.selectedVoiceName = preparedItem.voiceName
+        tts.backendDocumentRequestId = preparedItem.requestId
         tts.prepareNewFileOnly(
             text: content,
-            url: resolvedItem.generatedTextURL,
-            title: resolvedItem.title,
-            onlineSourceReference: resolvedItem.originalURL,
-            onlineProjectTitle: resolvedItem.projectTitle
+            url: preparedItem.generatedTextURL,
+            title: preparedItem.title,
+            onlineSourceReference: preparedItem.originalURL,
+            onlineProjectTitle: preparedItem.projectTitle,
+            backendTotalDuration: resolvedDuration
         )
         tts.appVoice = .backend
-        tts.selectedVoiceSampleId = resolvedItem.voiceSampleId
-        tts.selectedVoiceName = resolvedItem.voiceName
-        tts.backendDocumentRequestId = resolvedItem.requestId
+        tts.selectedVoiceSampleId = preparedItem.voiceSampleId
+        tts.selectedVoiceName = preparedItem.voiceName
+        tts.backendDocumentRequestId = preparedItem.requestId
         tts.backendTranscript = content
         tts.backendJobPhase = .completed
         tts.backendJobProgress = 100
@@ -177,6 +185,19 @@ struct OnlineLibraryPlayerView: View {
                 localAudioPath: localAudioPath
             )
         }
+    }
+
+    private func computeTotalDuration(for item: OnlineLibraryItem) -> TimeInterval? {
+        let urls = item.resolvedLocalAudioURLs
+        guard !urls.isEmpty else { return nil }
+
+        let durations = urls.compactMap { url -> TimeInterval? in
+            guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+            return try? AVAudioPlayer(contentsOf: url).duration
+        }
+
+        let total = durations.reduce(0, +)
+        return total > 0 ? total : nil
     }
 }
 

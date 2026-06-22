@@ -217,7 +217,7 @@ extension TTSBackendService {
         if let url = audioCache[nextOrder] {
             playAudio(from: url, order: nextOrder, sentences: sentences, player: player)
         } else {
-            player.state = .loading
+            player.backendJobPhase = .prefetchingNextChunk
             startFlow(
                 sentences: sentences,
                 currentIndex: index,
@@ -245,7 +245,7 @@ extension TTSBackendService {
             return
         }
 
-        player.state = .loading
+        player.backendJobPhase = .prefetchingNextChunk
         startFlow(
             sentences: sentences,
             currentIndex: max(0, order - 1),
@@ -264,8 +264,10 @@ extension TTSBackendService {
                let url = audioCache[nextOrder] {
                 playAudio(from: url, order: nextOrder, sentences: player.sentences, player: player)
             } else if nextOrder <= player.sentences.count {
-                player.state = .loading
+                player.currentTime = player.totalDuration
+                player.state = .paused
                 player.backendJobPhase = .prefetchingNextChunk
+                player.backendPendingAutoAdvance = true
                 startFlow(
                     sentences: player.sentences,
                     currentIndex: player.currentIndex,
@@ -277,9 +279,94 @@ extension TTSBackendService {
                 player.state = .finished
                 player.currentWordInSentence = ""
                 player.currentWordRange = nil
+                player.backendPendingAutoAdvance = false
                 player.updateTimeToComplete()
             }
         }
+    }
+
+    func seekPlayback(
+        to time: TimeInterval,
+        sentenceIndex: Int,
+        sentences: [String],
+        player: TTSPlayer,
+        resume: Bool
+    ) {
+        guard sentences.indices.contains(sentenceIndex) else { return }
+
+        let order = sentenceIndex + 1
+        let effectiveTime = player.totalDuration > 0 ? min(max(time, 0), player.totalDuration) : max(time, 0)
+        let localStart = max(0, effectiveTime - sentenceStartTime(for: order, durations: player.estimatedSentenceDurations))
+        player.currentIndex = sentenceIndex
+        player.currentSentenceText = sentences[sentenceIndex]
+        player.currentWordInSentence = ""
+        player.currentWordRange = nil
+        player.currentWordIndexInSentence = nil
+        player.currentWordToken = nil
+        player.position = .init(sentenceIndex: sentenceIndex, wordNSRange: nil, wordIndex: nil)
+        player.currentTime = effectiveTime
+        player.progress = player.totalDuration > 0 ? min(effectiveTime / player.totalDuration, 1.0) : player.progress
+        player.timeToComplete = max(player.totalDuration - player.currentTime, 0)
+
+        let cachedURL: URL?
+
+        if let url = audioCache[order] {
+            cachedURL = url
+        } else if
+            let documentRequestId = backendRequestId,
+            let chunk = chunkStore.fetchChunk(documentRequestId: documentRequestId, chunkIndex: order),
+            let localAudioPath = chunk.localAudioPath,
+            FileManager.default.fileExists(atPath: localAudioPath)
+        {
+            let url = URL(fileURLWithPath: localAudioPath)
+            audioCache[order] = url
+            cachedURL = url
+        } else {
+            cachedURL = nil
+        }
+
+        guard let url = cachedURL else {
+            if resume {
+                player.backendJobPhase = .prefetchingNextChunk
+                player.backendPendingAutoAdvance = true
+                startFlow(
+                    sentences: sentences,
+                    currentIndex: sentenceIndex,
+                    selectedVoiceSampleId: activeVoiceSampleId ?? player.selectedVoiceSampleId,
+                    player: player,
+                    resumeAt: sentenceIndex
+                )
+            }
+            return
+        }
+
+        if currentPlaybackOrder == order, let audioPlayer {
+            let clampedStart = max(0, min(localStart, audioPlayer.duration))
+            audioPlayer.currentTime = clampedStart
+            player.currentTime = time
+            player.progress = player.totalDuration > 0 ? min(time / player.totalDuration, 1.0) : player.progress
+            player.timeToComplete = max(player.totalDuration - player.currentTime, 0)
+
+            if resume {
+                audioPlayer.play()
+                player.state = .playing
+                startProgressTimer()
+            } else {
+                audioPlayer.pause()
+                player.state = .paused
+                stopProgressTimer()
+            }
+            return
+        }
+
+        playAudio(
+            from: url,
+            order: order,
+            sentences: sentences,
+            player: player,
+            startAt: localStart,
+            shouldResume: resume
+        )
     }
 }
 
@@ -385,13 +472,23 @@ extension TTSBackendService {
                 remoteAudioURL: remoteAudioURL,
                 localAudioPath: local.path
             )
-            await syncOnlineLibraryAudioMetadata(documentRequestId: documentRequestId)
 
             await MainActor.run {
                 audioCache[order] = local
+                self.synchronizeTimeline(
+                    documentRequestId: documentRequestId,
+                    currentOrder: order,
+                    currentPlayer: nil,
+                    sentences: sentences,
+                    player: player
+                )
                 player.backendJobPhase = .completed
                 player.backendJobProgress = 100
-                if order == player.currentIndex + 1 && player.state != .paused {
+                self.syncOnlineLibraryAudioMetadata(
+                    documentRequestId: documentRequestId,
+                    totalDuration: player.totalDuration
+                )
+                if order == player.currentIndex + 1 && (player.state != .paused || player.backendPendingAutoAdvance) {
                     playAudio(from: local, order: order, sentences: sentences, player: player)
                 }
             }
@@ -441,11 +538,13 @@ extension TTSBackendService {
         await MainActor.run {
             player.backendJobPhase = .uploadingSource
         }
+        Logger.log("⬆️ [Backend] Uploading source file for request \(initialUploadData.requestId)")
         try await jobService.uploadFile(fileURL: initialUpload.fileURL, to: initialUploadData.uploadUrl)
 
         await MainActor.run {
             player.backendJobPhase = .triggeringSpeechGeneration
         }
+        Logger.log("▶️ [Backend] Triggering speech generation for request \(initialUploadData.requestId)")
         let triggerStatus = try await jobService.triggerSpeechGeneration(
             requestId: initialUploadData.requestId,
             userId: nil,
@@ -556,12 +655,22 @@ extension TTSBackendService {
             chunkIndex: 1,
             localAudioPath: local.path
         )
-        await syncOnlineLibraryAudioMetadata(documentRequestId: initialUploadData.requestId)
 
         await MainActor.run {
             audioCache[1] = local
+            self.synchronizeTimeline(
+                documentRequestId: initialUploadData.requestId,
+                currentOrder: 1,
+                currentPlayer: nil,
+                sentences: sentences,
+                player: player
+            )
             player.backendJobPhase = .completed
             player.backendJobProgress = 100
+            self.syncOnlineLibraryAudioMetadata(
+                documentRequestId: initialUploadData.requestId,
+                totalDuration: player.totalDuration
+            )
             if resumeIndex == 0 && player.state != .paused {
                 playAudio(from: local, order: 1, sentences: sentences, player: player)
             }
@@ -588,7 +697,7 @@ extension TTSBackendService {
 
 extension TTSBackendService {
     @MainActor
-    private func syncOnlineLibraryAudioMetadata(documentRequestId: String) {
+    private func syncOnlineLibraryAudioMetadata(documentRequestId: String, totalDuration: TimeInterval? = nil) {
         guard let existing = onlineLibraryStore.items.first(where: { $0.requestId == documentRequestId }) else {
             return
         }
@@ -600,10 +709,20 @@ extension TTSBackendService {
         var updated = existing
         updated.remoteAudioURLs = remoteAudioURLs
         updated.localAudioPaths = localAudioPaths
+        if let totalDuration {
+            updated.totalDuration = totalDuration
+        }
         onlineLibraryStore.save(item: updated)
     }
 
-    private func playAudio(from url: URL, order: Int, sentences: [String], player: TTSPlayer) {
+    private func playAudio(
+        from url: URL,
+        order: Int,
+        sentences: [String],
+        player: TTSPlayer,
+        startAt: TimeInterval = 0,
+        shouldResume: Bool = true
+    ) {
         do {
             stopProgressTimer()
             audioPlayer?.stop()
@@ -623,11 +742,23 @@ extension TTSBackendService {
             player.currentIndex = order - 1
             player.currentSentenceText = sentences[player.currentIndex]
             player.lastPlayedContentId = player.preparedContentId
-            player.currentTime = sentenceStartTime(for: order, durations: player.estimatedSentenceDurations)
-            audioPlayer?.play()
-            player.state = .playing
-            startProgressTimer()
-            prefetchUpcomingChunks(after: order, sentences: sentences, player: player)
+            let clampedStart = max(0, min(startAt, audioPlayer?.duration ?? startAt))
+            audioPlayer?.currentTime = clampedStart
+            player.currentTime = sentenceStartTime(for: order, durations: player.estimatedSentenceDurations) + clampedStart
+            player.progress = player.totalDuration > 0 ? min(player.currentTime / player.totalDuration, 1.0) : player.progress
+            player.timeToComplete = max(player.totalDuration - player.currentTime, 0)
+
+            if shouldResume {
+                audioPlayer?.play()
+                player.state = .playing
+                player.backendPendingAutoAdvance = false
+                startProgressTimer()
+                prefetchUpcomingChunks(after: order, sentences: sentences, player: player)
+            } else {
+                audioPlayer?.pause()
+                player.state = .paused
+                stopProgressTimer()
+            }
             Logger.log("🔊 [Backend] Playing order \(order)/\(sentences.count)")
         } catch {
             Logger.error(error)
@@ -730,7 +861,14 @@ extension TTSBackendService {
                 player.currentTime = start + audioPlayer.currentTime
                 if player.totalDuration > 0 {
                     player.progress = min(player.currentTime / player.totalDuration, 1.0)
+                    player.timeToComplete = max(player.totalDuration - player.currentTime, 0)
                 }
+                self.maybePrefetchNextChunk(
+                    currentOrder: order,
+                    audioPlayer: audioPlayer,
+                    sentences: player.sentences,
+                    player: player
+                )
             }
         }
     }
@@ -769,17 +907,32 @@ extension TTSBackendService {
             durations[currentIndex] = currentPlayer.duration
         }
 
-        let knownDurations = durations.filter { $0 > 0 }
-        let averageKnown = knownDurations.isEmpty ? 0.0 : knownDurations.reduce(0, +) / Double(knownDurations.count)
-        let resolvedDurations = durations.map { $0 > 0 ? $0 : averageKnown }
-        let total = resolvedDurations.reduce(0, +)
+        let resolvedDurations = durations
+        let total = resolvedDurations.prefix(while: { $0 > 0 }).reduce(0, +)
 
         if resolvedDurations.contains(where: { $0 > 0 }) {
             player.estimatedSentenceDurations = resolvedDurations
-            player.totalDuration = total
+            player.totalDuration = total > 0 ? total : player.totalDuration
             player.isSeekable = total > 0
             player.timeToComplete = max(total - sentenceStartTime(for: currentOrder, durations: resolvedDurations), 0)
         }
+    }
+
+    private func maybePrefetchNextChunk(
+        currentOrder: Int,
+        audioPlayer: AVAudioPlayer,
+        sentences: [String],
+        player: TTSPlayer
+    ) {
+        let nextOrder = currentOrder + 1
+        guard nextOrder <= sentences.count else { return }
+        guard audioCache[nextOrder] == nil else { return }
+        guard !inFlightOrders.contains(nextOrder) else { return }
+
+        let remaining = max(audioPlayer.duration - audioPlayer.currentTime, 0)
+        guard remaining <= 1.5 else { return }
+
+        prefetchUpcomingChunks(after: currentOrder, sentences: sentences, player: player)
     }
 
     private func sentenceStartTime(for order: Int, durations: [TimeInterval]) -> TimeInterval {

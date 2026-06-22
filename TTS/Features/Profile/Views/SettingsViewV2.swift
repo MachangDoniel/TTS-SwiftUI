@@ -801,24 +801,32 @@ private extension VoicePreferencesViewV2 {
     func loadPendingVoiceFromCurrentSelection() {
         pendingVoiceSampleId = tts.selectedVoiceSampleId
         pendingVoiceName = tts.selectedVoiceName
-        pendingVoiceMode = tts.appVoice
+        pendingVoiceMode = resolvedPendingVoiceMode(for: tts.selectedVoiceSampleId) ?? tts.appVoice
     }
 
     func setPendingVoice(_ voice: Voice) {
         pendingVoiceSampleId = voice.voiceSampleId
         pendingVoiceName = voice.name
-        pendingVoiceMode = voice.isSystemVoice ? .system : .backend
+        pendingVoiceMode = resolvedPendingVoiceMode(for: voice.voiceSampleId) ?? (voice.isSystemVoice ? .system : .backend)
     }
 
     func savePendingVoice() {
         guard !pendingVoiceSampleId.isEmpty else { return }
-        if tts.appVoice != pendingVoiceMode {
-            tts.updateVoiceMode(pendingVoiceMode)
-        }
+        let targetMode = resolvedPendingVoiceMode(for: pendingVoiceSampleId) ?? pendingVoiceMode
         tts.selectedVoiceName = pendingVoiceName
+        if tts.appVoice != targetMode {
+            tts.updateVoiceMode(targetMode)
+        }
         tts.updateSelectedVoiceSampleId(pendingVoiceSampleId)
         tts.activatePlaybackAudioSession()
         dismiss()
+    }
+
+    func resolvedPendingVoiceMode(for voiceSampleId: String) -> AppVoiceMode? {
+        guard let voice = voiceCatalog.voices.first(where: { $0.voiceSampleId == voiceSampleId }) else {
+            return nil
+        }
+        return voice.isSystemVoice ? .system : .backend
     }
 
     @MainActor

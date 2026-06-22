@@ -84,6 +84,7 @@ final class TTSPlayer: NSObject, ObservableObject {
     private var sentenceStartTime: TimeInterval = 0.0
     private var playbackStartTime: Date?
     private var skipTask: Task<Void, Never>?
+    var backendPendingAutoAdvance: Bool = false
     
     // MARK: - Computed State
     var isSpeaking: Bool { state == .playing || state == .paused }
@@ -155,7 +156,8 @@ extension TTSPlayer {
         url: URL?,
         title: String?,
         onlineSourceReference: URL? = nil,
-        onlineProjectTitle: String? = nil
+        onlineProjectTitle: String? = nil,
+        backendTotalDuration: TimeInterval? = nil
     ) {
         // Stop any ongoing playback from the previous file
         synthesizer.stopSpeaking(at: .immediate)
@@ -184,6 +186,12 @@ extension TTSPlayer {
         position = .init(sentenceIndex: 0, wordNSRange: nil, wordIndex: nil)
         progress = 0.0
         state = .paused
+
+        if appVoice == .backend, let backendTotalDuration, backendTotalDuration > 0 {
+            totalDuration = backendTotalDuration
+            isSeekable = true
+            timeToComplete = max(backendTotalDuration - currentTime, 0)
+        }
     }
     
     /// Auto-starts playback from the beginning.
@@ -321,6 +329,7 @@ extension TTSPlayer {
         case .backend:
             if contentChanged {
                 backendWorker.cancel()
+                backendPendingAutoAdvance = false
                 currentIndex = 0
                 currentSentenceText = sentences.first ?? ""
                 currentWordInSentence = ""
@@ -343,6 +352,7 @@ extension TTSPlayer {
                 currentWordToken = nil
                 position = .init(sentenceIndex: 0, wordNSRange: nil, wordIndex: nil)
                 progress = 0.0
+                backendPendingAutoAdvance = false
                 startBackendFlow(resumeAt: currentIndex)
                 return
             }
@@ -354,6 +364,7 @@ extension TTSPlayer {
                 stopProgressTimer()
                 currentTime = frozenTime
                 state = .paused
+                backendPendingAutoAdvance = false
             case .paused:
                 startProgressTimer()
                 backendWorker.resume()
@@ -367,6 +378,7 @@ extension TTSPlayer {
                 currentWordToken = nil
                 position = .init(sentenceIndex: 0, wordNSRange: nil, wordIndex: nil)
                 progress = 0.0
+                backendPendingAutoAdvance = false
                 startBackendFlow(resumeAt: currentIndex)
             case .loading:
                 break
@@ -385,6 +397,7 @@ extension TTSPlayer {
         audioPlayer = nil
         backendWorker.stopCurrent(player: self)
         backendWorker.cancelGenerationOnly(keepingAudio: true)
+        backendPendingAutoAdvance = false
         
         stopProgressTimer()
         
@@ -413,6 +426,7 @@ extension TTSPlayer {
         audioPlayer?.stop()
         audioPlayer = nil
         backendWorker.cancel()
+        backendPendingAutoAdvance = false
         
         stopProgressTimer()
         
@@ -508,10 +522,10 @@ extension TTSPlayer {
             currentWordToken = nil
             position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
             state = .playing
-            progress = Double(currentIndex) / Double(max(1, sentences.count))
             // Update time to complete after moving to next sentence
             updateTimeToComplete()
             backendWorker.playNext(from: currentIndex, sentences: sentences, player: self)
+            progress = totalDuration > 0 ? min(currentTime / totalDuration, 1.0) : progress
         }
     }
     
@@ -608,10 +622,10 @@ extension TTSPlayer {
             currentWordToken = nil
             position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
             state = .playing
-            progress = Double(currentIndex) / Double(max(1, sentences.count))
             // Update time to complete after moving to previous sentence
             updateTimeToComplete()
             backendWorker.playPrevious(from: currentIndex, sentences: sentences, player: self)
+            progress = totalDuration > 0 ? min(currentTime / totalDuration, 1.0) : progress
         }
     }
 }
@@ -1098,40 +1112,27 @@ extension TTSPlayer {
     
     // MARK: - Backend Voice Timeline Methods
     private func skipForwardBackend(_ seconds: TimeInterval) {
-        guard let player = audioPlayer else { return }
-        let targetTime = player.currentTime + seconds
-        if targetTime < player.duration {
-            player.currentTime = targetTime
-            currentTime = getSentenceStartTime(currentIndex) + targetTime
-        } else {
-            // Skip to next sentence
-            nextSentence()
-        }
+        guard sentences.indices.contains(currentIndex) else { return }
+        let targetTime = min(currentTime + seconds, totalDuration > 0 ? totalDuration : currentTime + seconds)
+        seekBackendVoice(to: targetTime, sentenceIndex: findSentenceIndex(for: targetTime))
     }
-    
+
     private func skipBackwardBackend(_ seconds: TimeInterval) {
-        guard let player = audioPlayer else { return }
-        let targetTime = max(0, player.currentTime - seconds)
-        player.currentTime = targetTime
-        currentTime = getSentenceStartTime(currentIndex) + targetTime
+        guard sentences.indices.contains(currentIndex) else { return }
+        let targetTime = max(currentTime - seconds, 0)
+        seekBackendVoice(to: targetTime, sentenceIndex: findSentenceIndex(for: targetTime))
     }
-    
+
     private func seekBackendVoice(to time: TimeInterval, sentenceIndex: Int) {
-        // For backend mode, switch to correct audio file
-        currentIndex = sentenceIndex
-        currentSentenceText = sentences[currentIndex]
-        currentWordInSentence = ""
-        currentWordRange = nil
-        currentWordIndexInSentence = nil
-        currentWordToken = nil
-        position = .init(sentenceIndex: currentIndex, wordNSRange: nil, wordIndex: nil)
-        state = .playing
-        progress = Double(currentIndex) / Double(max(1, sentences.count))
-        // Update time to complete after seeking
-        updateTimeToComplete()
-        
-        // Start playing the sentence
-        playFromCurrent()
+        let shouldResume = state != .paused
+        backendPendingAutoAdvance = shouldResume
+        backendWorker.seekPlayback(
+            to: time,
+            sentenceIndex: sentenceIndex,
+            sentences: sentences,
+            player: self,
+            resume: shouldResume
+        )
     }
     
     // MARK: - Timeline Utilities
@@ -1184,7 +1185,11 @@ extension TTSPlayer {
         }
         
         // Total duration = total words * 0.4 seconds
-        totalDuration = 0.4 * Double(totalWordCount)
+        if appVoice == .backend {
+            totalDuration = 0.0
+        } else {
+            totalDuration = 0.4 * Double(totalWordCount)
+        }
         
         // Estimate per-sentence durations for timeline
         let wordsPerMinute: Double = 150 // Average speaking rate for timeline estimation
@@ -1193,7 +1198,7 @@ extension TTSPlayer {
             return (Double(words) / wordsPerMinute) * 60.0
         }
         
-        isSeekable = true
+        isSeekable = appVoice != .backend
         // Initialize timeToComplete at start (force update on initial load)
         updateTimeToComplete(forceUpdate: true)
     }
@@ -1222,13 +1227,6 @@ extension TTSPlayer {
         if forceUpdate || abs(newTimeToComplete - timeToComplete) > 5.0 {
             timeToComplete = newTimeToComplete
         }
-        
-        // Also update the overall totalDuration so the slider end reflects the latest estimate.
-        // New total estimate = elapsed time so far + remaining time.
-        let proposedTotalDuration = currentTime + newTimeToComplete
-        if forceUpdate || abs(proposedTotalDuration - totalDuration) > 5.0 {
-            totalDuration = proposedTotalDuration
-        }
     }
     
     private func startProgressTimer() {
@@ -1250,10 +1248,18 @@ extension TTSPlayer {
         case .system:
             if let startTime = playbackStartTime {
                 currentTime = sentenceStartTime + Date().timeIntervalSince(startTime)
+                if totalDuration > 0 {
+                    progress = min(currentTime / totalDuration, 1.0)
+                    timeToComplete = max(totalDuration - currentTime, 0)
+                }
             }
         case .backend:
             if let player = audioPlayer {
                 currentTime = getSentenceStartTime(currentIndex) + player.currentTime
+                if totalDuration > 0 {
+                    progress = min(currentTime / totalDuration, 1.0)
+                    timeToComplete = max(totalDuration - currentTime, 0)
+                }
             }
         }
     }
@@ -1303,6 +1309,11 @@ extension TTSPlayer {
             disableHighlighting = true
         } else {
             disableHighlighting = false
+        }
+
+        // Keep system playback on system voices. Only backend mode auto-switches voices.
+        guard appVoice == .backend else {
+            return
         }
         
         // Get current voice to check if it already matches
@@ -1357,6 +1368,11 @@ extension TTSPlayer {
     /// - Returns: The detected language code, or nil if detection failed
     private func detectAndSwitchVoiceForSentence(at sentenceIndex: Int) -> String? {
         if backendDocumentRequestId != nil || onlineProjectSourceURL != nil, appVoice == .backend {
+            return nil
+        }
+
+        // Only backend playback should auto-switch voices.
+        guard appVoice == .backend else {
             return nil
         }
 
@@ -1506,6 +1522,11 @@ extension TTSPlayer {
     /// Only switches at sentence boundaries, not mid-sentence
     /// - Parameter detectedLanguageCode: The detected language code (e.g., "en", "es")
     private func switchVoiceIfNeeded(for detectedLanguageCode: String) {
+        // Only backend playback should auto-switch voices.
+        guard appVoice == .backend else {
+            return
+        }
+
         // Only allow voice switching when starting a new sentence (idle/paused) or when already starting playback
         // Never interrupt mid-sentence playback to switch voice
         guard state == .idle || state == .paused || isStartingPlayback else {

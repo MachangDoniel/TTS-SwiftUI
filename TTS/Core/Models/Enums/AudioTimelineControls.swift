@@ -66,7 +66,7 @@ struct AudioTimelineControls: View {
                 
                 Spacer()
                 
-                Text("\(min(tts.currentIndex, tts.sentences.count - 1) + 1) of \(max(tts.sentences.count, 1))")
+                Text(counterText())
                     .font(.caption)
                     .foregroundColor(.gray)
                 
@@ -97,6 +97,16 @@ struct AudioTimelineControls: View {
         let seconds = Int(time) % 60
         return String(format: "%d:%02d", minutes, seconds)
     }
+
+    private func counterText() -> String {
+        if tts.appVoice == .backend, let requestId = tts.backendDocumentRequestId {
+            let chunkCount = BackendChunkStore.shared.fetchAllChunks(documentRequestId: requestId).count
+            let currentChunk = min(tts.currentIndex + 1, max(chunkCount, 1))
+            return "Chunk \(currentChunk) of \(max(chunkCount, 1))"
+        }
+
+        return "\(min(tts.currentIndex, tts.sentences.count - 1) + 1) of \(max(tts.sentences.count, 1))"
+    }
 }
 
 struct TimelineSlider: View {
@@ -106,21 +116,55 @@ struct TimelineSlider: View {
     
     var body: some View {
         VStack(spacing: 4) {
-            Slider(
-                value: isDragging ? $dragValue : .constant(tts.currentTime),
-                in: 0...max(1, tts.totalDuration),
-                onEditingChanged: { editing in
-                    if editing {
-                        isDragging = true
-                        dragValue = tts.currentTime
-                    } else {
-                        tts.seek(to: dragValue)
-                        isDragging = false
-                    }
+            GeometryReader { geo in
+                let width = geo.size.width
+                let upper = max(1, tts.totalDuration)
+                let value = min(max(isDragging ? dragValue : tts.currentTime, 0), upper)
+                let progress = CGFloat(value / upper)
+                let thumbX = width * progress
+
+                ZStack(alignment: .leading) {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.25))
+                        .frame(height: 3)
+                        .cornerRadius(2)
+
+                    Rectangle()
+                        .fill(Color.myPrimaryColor)
+                        .frame(width: thumbX, height: 3)
+                        .cornerRadius(2)
+
+                    Circle()
+                        .fill(Color.myPrimaryColor)
+                        .frame(width: 12, height: 12)
+                        .offset(x: thumbX - 6)
                 }
-            )
-            .accentColor(.myPrimaryColor)
-            .disabled(!tts.isSeekable)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { gesture in
+                            guard tts.isSeekable else { return }
+                            let location = min(max(0, gesture.location.x), width)
+                            let percent = width > 0 ? location / width : 0
+                            let newValue = percent * upper
+
+                            if !isDragging {
+                                isDragging = true
+                                dragValue = tts.currentTime
+                            }
+                            dragValue = min(max(newValue, 0), upper)
+                        }
+                        .onEnded { _ in
+                            guard tts.isSeekable else {
+                                isDragging = false
+                                return
+                            }
+                            tts.seek(to: dragValue)
+                            isDragging = false
+                        }
+                )
+            }
+            .frame(height: 24)
             
             // Progress indicators (sentences)
             if !tts.sentences.isEmpty && tts.isSeekable && !tts.disableHighlighting {

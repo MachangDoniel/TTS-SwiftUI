@@ -26,6 +26,7 @@ struct OnlineLibraryItem: Identifiable, Codable, Equatable {
     var localAudioPaths: [String]
     var voiceSampleId: String
     var voiceName: String
+    var totalDuration: TimeInterval?
     var createdAt: Date
 
     init(
@@ -47,6 +48,7 @@ struct OnlineLibraryItem: Identifiable, Codable, Equatable {
         localAudioPaths: [String],
         voiceSampleId: String,
         voiceName: String,
+        totalDuration: TimeInterval? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -67,6 +69,7 @@ struct OnlineLibraryItem: Identifiable, Codable, Equatable {
         self.localAudioPaths = localAudioPaths
         self.voiceSampleId = voiceSampleId
         self.voiceName = voiceName
+        self.totalDuration = totalDuration
         self.createdAt = createdAt
     }
 
